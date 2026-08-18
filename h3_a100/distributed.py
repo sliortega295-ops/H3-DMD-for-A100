@@ -1,31 +1,22 @@
-"""Two-node A100 topology and shard-group synchronization helpers.
+"""Two-node A100 topology helpers with world16 data semantics.
 
-Recommended layout for 2x8 A100:
-
-* mesh dim 0: 2 data replicas (one per node)
-* mesh dim 1: 8-way parameter shard group inside each node
-
-PyTorch FSDP2 interprets a 2-D mesh as ``(Replicate(), Shard(0))``. This keeps
-large parameter all-gathers inside the node/NVLink domain and reduces only
-replica gradients across nodes.
+HSDP changes only physical parameter placement. It must not collapse the data
+parallel contract: all 16 global ranks still consume independent B1 samples and
+independent RNG streams, matching the world16 FSDP baseline.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import os
-import random
 from datetime import timedelta
 from typing import Any
 
-import numpy as np
 import torch
 import torch.distributed as dist
 from loguru import logger
 from torch.distributed.device_mesh import init_device_mesh
 
-_SHARD_GROUP = None
-_SHARD_SRC_RANK = 0
 _SHARD_RANK = 0
 _SHARD_SIZE = 1
 
@@ -44,12 +35,12 @@ def resolve_hybrid_topology(world_size: int, rank: int, shard_size: int) -> Hybr
     rank = int(rank)
     shard_size = int(shard_size)
     if world_size < 1:
-        raise ValueError(f"world_size must be positive, got {world_size}")
+        raise ValueError(f"world_size must be positive, got {world_size}.")
     if not 0 <= rank < world_size:
-        raise ValueError(f"rank={rank} is outside world_size={world_size}")
+        raise ValueError(f"rank={rank} is outside world_size={world_size}.")
     if shard_size < 1 or world_size % shard_size:
         raise ValueError(
-            f"hybrid shard_size={shard_size} must be positive and divide WORLD_SIZE={world_size}"
+            f"hybrid shard_size={shard_size} must be positive and divide WORLD_SIZE={world_size}."
         )
     replicate_size = world_size // shard_size
     return HybridTopology(
@@ -70,7 +61,12 @@ def hybrid_enabled(config: dict[str, Any]) -> bool:
 
 
 def init_distributed_a100(config: dict[str, Any] | None = None) -> None:
-    """Initialize LightX2V globals with optional HSDP topology."""
+    """Initialize ordinary world16 FSDP or optional 2x8 HSDP.
+
+    For HSDP, the 2-D mesh is used only by FSDP2. LightX2V's dataset/data-rank
+    globals remain world16 so every global rank sees a distinct sample. Model
+    inputs and RNG are never broadcast across the 8-way parameter-shard group.
+    """
 
     config = config or {}
     if not hybrid_enabled(config):
@@ -98,52 +94,41 @@ def init_distributed_a100(config: dict[str, Any] | None = None) -> None:
         _hybrid_config(config).get("shard_size", int(os.environ.get("LOCAL_WORLD_SIZE", 8)))
     )
     topology = resolve_hybrid_topology(world_size, rank, shard_size)
-
     mesh = init_device_mesh(
         "cuda",
         (topology.replicate_size, topology.shard_size),
         mesh_dim_names=("replicate", "shard"),
     )
 
-    global _SHARD_GROUP, _SHARD_SRC_RANK, _SHARD_RANK, _SHARD_SIZE
-    _SHARD_GROUP = mesh["shard"].get_group()
-    _SHARD_SRC_RANK = topology.replicate_rank * topology.shard_size
+    global _SHARD_RANK, _SHARD_SIZE
     _SHARD_RANK = topology.shard_rank
     _SHARD_SIZE = topology.shard_size
 
     runtime_dist._DEVICE_MESH = mesh
     runtime_dist._FSDP_DEVICE_MESH = mesh
-    runtime_dist._DP_GROUP = mesh["replicate"].get_group()
+    # Critical control-variable rule: HSDP is placement, not a batch change.
+    runtime_dist._DP_GROUP = dist.group.WORLD
     runtime_dist._SP_GROUP = None
-    runtime_dist._DP_RANK = topology.replicate_rank
-    runtime_dist._DP_WORLD_SIZE = topology.replicate_size
+    runtime_dist._DP_RANK = rank
+    runtime_dist._DP_WORLD_SIZE = world_size
     runtime_dist._SP_RANK = 0
     runtime_dist._SP_WORLD_SIZE = 1
 
     _patch_fsdp_enabled()
-    _seed_replica(config, topology.replicate_rank)
     logger.info(
         "[h3-a100] HSDP initialized world={} replicate={} shard={} "
-        "replicate_rank={} shard_rank={}",
+        "replicate_rank={} shard_rank={} data_parallel_world={}",
         topology.world_size,
         topology.replicate_size,
         topology.shard_size,
         topology.replicate_rank,
         topology.shard_rank,
+        world_size,
     )
 
 
-def _seed_replica(config: dict[str, Any], replicate_rank: int) -> None:
-    base_seed = int(config.get("training", {}).get("seed", 42))
-    seed = base_seed + int(replicate_rank)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
 def _patch_fsdp_enabled() -> None:
-    """Recognize a 1-replica x 8-shard single-node smoke topology."""
+    """Recognize both 1-D FSDP2 and a 1x8/2x8 HSDP mesh."""
 
     import lightx2v_train.runtime.fsdp as fsdp_runtime
 
@@ -171,15 +156,3 @@ def shard_group_size() -> int:
 
 def shard_group_rank() -> int:
     return _SHARD_RANK
-
-
-def shard_source() -> bool:
-    return _SHARD_RANK == 0
-
-
-def broadcast_shard_tensor(tensor: torch.Tensor) -> torch.Tensor:
-    """Make model inputs identical within one HSDP shard group."""
-
-    if _SHARD_GROUP is not None and _SHARD_SIZE > 1:
-        dist.broadcast(tensor, src=_SHARD_SRC_RANK, group=_SHARD_GROUP)
-    return tensor
