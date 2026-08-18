@@ -1,0 +1,49 @@
+{
+  "status": "PRIMARY_CAPACITY_BLOCKED",
+  "formal_full5": "NOT_RUN",
+  "source_head": "f00ef38406fcfeea06e45567482ecc898df192aa",
+  "lightx2v_head": "d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be",
+  "contract": {
+    "world_size": 16,
+    "nodes": 2,
+    "gpus_per_node": 8,
+    "resolution": "768x1344",
+    "frames": 124,
+    "dtype": "bf16",
+    "student_lora_rank": 128,
+    "fake_lora_rank": 128,
+    "num_inference_steps": 4,
+    "fake_update_ratio": 5,
+    "fixed_end_step_idx": 3,
+    "gradient_accumulation": 1
+  },
+  "gates": {
+    "one_node_smoke_default_checkpoint": "PASS",
+    "one_node_smoke_segment8": "PASS",
+    "world16_default_checkpoint": "FAIL_CUDA_OOM",
+    "world16_segment8": "FAIL_CUDA_OOM",
+    "world16_segment8_activation_offload_128m": "FAIL_CUDA_OOM",
+    "world16_segment8_activation_offload_64m": "FAIL_CUDA_OOM",
+    "world16_full5": "NOT_RUN",
+    "world16_cp_sp2": "NOT_RUN"
+  },
+  "r5": {
+    "run_id": "h3_world16_shared_backbone_onecycle_20260818_r5_sac_seg8_actoff64",
+    "offload_min_bytes": 67108864,
+    "rank0_offloaded_saved_tensor_bytes": 3651056640,
+    "rank0_offload_count": 9,
+    "oom_location": "first Student backward checkpoint recompute FFN LoRA projection",
+    "oom_attempt_gib": 2.02,
+    "allocated_gib": 37.87,
+    "reserved_unallocated_mib": 644,
+    "driver_free_mib": "74-134",
+    "cgroup_oom_delta": 0,
+    "correctness": "NOT_RUN",
+    "timing": "NOT_RUN"
+  },
+  "artifacts": {
+    "preflight": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_301_preflight_20260818",
+    "segment8_failure": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_302_sac_seg8_world16_20260818",
+    "activation_offload": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_303_selective_activation_offload_20260818"
+  }
+}
