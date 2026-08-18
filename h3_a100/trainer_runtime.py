@@ -10,7 +10,7 @@ import torch
 from lightx2v_train.model_zoo.native.minimax_h3 import build_row_timesteps
 from lightx2v_train.trainers.dmd.math import dmd_loss_pair, weighted_mse_pair
 
-from .distributed import broadcast_shard_tensor, shard_source
+from .matched_contract import FAKE_ROLE, STUDENT_ROLE, TEACHER_ROLE
 from .model import BASE_ROLE, FAKE_ADAPTER, STUDENT_ADAPTER
 
 
@@ -29,55 +29,44 @@ class H3A100RuntimeMixin:
     """Methods that execute Student/Fake/Teacher forwards on one module."""
 
     # ------------------------------------------------------------------
-    # HSDP input synchronization
+    # RNG and rollout control
     # ------------------------------------------------------------------
     def sample_initial_latents(self, latent_shape):
-        video = torch.empty(
-            latent_shape["video_tokens"], device=self.shared_model.device, dtype=self.latent_dtype
-        )
-        audio = torch.empty(
-            latent_shape["audio_tokens"], device=self.shared_model.device, dtype=self.latent_dtype
-        )
-        if shard_source():
-            video.normal_()
-            audio.normal_()
-        broadcast_shard_tensor(video)
-        broadcast_shard_tensor(audio)
-        return video, audio
+        # Match upstream LightX2V exactly. Sequence-parallel synchronization,
+        # if enabled in a future ablation, remains owned by the upstream helper.
+        return super().sample_initial_latents(latent_shape)
 
     def _sample_synced_int(self, low, high):
-        value = torch.empty((), device=self.shared_model.device, dtype=torch.int64)
-        if shard_source():
-            value.random_(int(low), int(high))
-        broadcast_shard_tensor(value)
-        return int(value.item())
+        if (
+            getattr(self, "matched_compute_enabled", False)
+            and int(low) == 0
+            and int(high) == int(self.num_inference_steps)
+        ):
+            return int(self.matched_fixed_end_step_idx)
+        return super()._sample_synced_int(low, high)
 
     def _sample_renoise_sigmas(self):
-        low = float(self.dmd_config.get("renoise_sigma_min", 0.02))
-        high = float(self.dmd_config.get("renoise_sigma_max", 0.98))
-        if not 0.0 <= low < high <= 1.0:
-            raise ValueError(
-                f"H3 renoise sigma range must satisfy 0 <= min < max <= 1, got [{low}, {high}]"
-            )
-        base = torch.empty((), device=self.shared_model.device, dtype=torch.float32)
-        if shard_source():
-            base.uniform_(low, high)
-        broadcast_shard_tensor(base)
-        video = self.video_shift * base / (1.0 + (self.video_shift - 1.0) * base)
-        audio = self.audio_shift * base / (1.0 + (self.audio_shift - 1.0) * base)
-        return video, audio
+        # Keep the exact continuous random-sigma objective used by upstream.
+        return super()._sample_renoise_sigmas()
 
-    def _randn_like_synced(self, tensor):
-        noise = torch.empty_like(tensor, dtype=torch.float32)
-        if shard_source():
-            noise.normal_()
-        broadcast_shard_tensor(noise)
-        return noise
+    @staticmethod
+    def _randn_like_exact(tensor):
+        return torch.randn_like(tensor, dtype=torch.float32)
 
     # ------------------------------------------------------------------
-    # Role switching and AdaLN precomputation
+    # Role switching, compute census, and AdaLN precomputation
     # ------------------------------------------------------------------
     def _predict_velocity_role(self, role, latents, sigmas, condition, latent_shape):
+        logical_role = {
+            STUDENT_ADAPTER: STUDENT_ROLE,
+            FAKE_ADAPTER: FAKE_ROLE,
+            BASE_ROLE: TEACHER_ROLE,
+        }[role]
+        if getattr(self, "matched_compute_enabled", False):
+            self.matched_cycle_census.note_forward(
+                logical_role,
+                grad_enabled=bool(torch.is_grad_enabled()),
+            )
         with self.shared_model.role_scope(role):
             return super()._predict_velocity(
                 self.shared_model, latents, sigmas, condition, latent_shape
@@ -138,8 +127,8 @@ class H3A100RuntimeMixin:
         )
         sigmas = self._sample_renoise_sigmas()
         noises = (
-            self._randn_like_synced(generated[0]),
-            self._randn_like_synced(generated[1]),
+            self._randn_like_exact(generated[0]),
+            self._randn_like_exact(generated[1]),
         )
         renoised = self._add_noise(generated, noises, sigmas)
 
@@ -184,8 +173,8 @@ class H3A100RuntimeMixin:
         generated = (generated[0].detach(), generated[1].detach())
         sigmas = self._sample_renoise_sigmas()
         noises = (
-            self._randn_like_synced(generated[0]),
-            self._randn_like_synced(generated[1]),
+            self._randn_like_exact(generated[0]),
+            self._randn_like_exact(generated[1]),
         )
         renoised = self._add_noise(generated, noises, sigmas)
         return PreparedFakeUpdate(
