@@ -10,6 +10,7 @@ from lightx2v_train.trainers.dmd.minimax_h3_trainer import MiniMaxH3T2AVDmdTrain
 from lightx2v_train.utils.registry import TRAINER_REGISTER
 
 from .checkpointing import H3A100CheckpointMixin
+from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
 from .trainer_runtime import H3A100RuntimeMixin
@@ -37,6 +38,7 @@ class MiniMaxH3A100DmdTrainer(
         a100 = self.training_config.get("a100", {})
         cache = a100.get("adaln_cache", {})
         reorder = a100.get("critic_rollout_reorder", {})
+        matched = a100.get("matched_compute", {})
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
         self.reorder_critic_rollouts = bool(reorder.get("enabled", True))
@@ -46,6 +48,18 @@ class MiniMaxH3A100DmdTrainer(
                 "critic_rollout_reorder.group_size must equal "
                 f"fake_update_ratio={self.fake_update_ratio} to preserve optimizer-step semantics"
             )
+
+        self.matched_compute_enabled = bool(matched.get("enabled", True))
+        self.matched_fixed_end_step_idx = int(matched.get("fixed_end_step_idx", FIXED_END_STEP_IDX))
+        self.matched_expected_world_size = int(matched.get("expected_world_size", 16))
+        self.matched_require_unique_samples = bool(matched.get("require_unique_samples", True))
+        self.matched_cycle_census = MatchedCycleCensus(
+            enabled=self.matched_compute_enabled,
+            fixed_end_step_idx=self.matched_fixed_end_step_idx,
+            expected_world_size=self.matched_expected_world_size,
+            require_unique_samples=self.matched_require_unique_samples,
+        )
+        self._validate_matched_static_contract()
         self._score_serial = 0
 
     @property
@@ -53,6 +67,23 @@ class MiniMaxH3A100DmdTrainer(
         if not isinstance(self.model, MiniMaxH3A100Model):
             raise TypeError(f"Expected MiniMaxH3A100Model, got {type(self.model)!r}")
         return self.model
+
+    def _validate_matched_static_contract(self) -> None:
+        if not self.matched_compute_enabled:
+            return
+        if self.matched_fixed_end_step_idx != FIXED_END_STEP_IDX:
+            raise ValueError(
+                f"matched_compute.fixed_end_step_idx must be {FIXED_END_STEP_IDX}, "
+                f"got {self.matched_fixed_end_step_idx}"
+            )
+        if int(self.num_inference_steps) != 4:
+            raise ValueError("matched MiniMax benchmark requires num_inference_steps=4")
+        if int(self.fake_update_ratio) != 5:
+            raise ValueError("matched MiniMax benchmark requires fake_update_ratio=5")
+        if int(self.gradient_accumulation_iters) != 1:
+            raise ValueError("matched MiniMax benchmark requires gradient_accumulation_iters=1")
+        if self.infer_every_iters:
+            raise ValueError("matched MiniMax benchmark forbids in-run inference")
 
     def setup(self, resume_ckpt_path=None):
         model = self.shared_model
@@ -100,11 +131,12 @@ class MiniMaxH3A100DmdTrainer(
         self._log_cuda_memory("after_setup")
         logger.info(
             "[h3-a100] setup physical_backbones=1 logical_roles=3 "
-            "student_params={} fake_params={} fsdp={} critic_reorder={}",
+            "student_params={} fake_params={} fsdp={} critic_reorder={} matched_compute={}",
             sum(p.numel() for p in self.trainable_params),
             sum(p.numel() for p in self.fake_trainable_params),
             model.is_fsdp2_wrapped(),
             self.reorder_critic_rollouts,
+            self.matched_compute_enabled,
         )
 
     def _validate_reorder_contract(self) -> None:
