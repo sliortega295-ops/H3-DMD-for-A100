@@ -1,53 +1,56 @@
 # Two-node A100 runbook
 
-## Target topology
+## Target topology and comparison rule
 
 - 2 nodes
 - 8×A100-40GB or A800-40GB per node
 - contiguous torchrun rank assignment by node
-- NVLink/NVSwitch inside each node
-- working NCCL transport between nodes
-- shared filesystem for model, prompt cache, output checkpoints
-- large host RAM; the current CPU-first loader may approach the node's memory limit during initialization
+- working NCCL between nodes
+- shared model/prompt-cache/output storage
 
-## 1. Prepare an identical checkout on both nodes
+The **primary controlled run** uses `configs/minimax_h3_t2av_dmd_a100_world16.yaml`: world16 FSDP2, B1 per global rank, global batch16. The optional `..._2x8.yaml` HSDP config is a placement ablation only and must preserve the same 16 independent samples/RNG streams.
+
+Every formal outer cycle must pass the matched-compute census:
+
+```text
+Student forward 24 / grad-forward 1 / backward 1
+Fake forward     6 / grad-forward 5 / backward 5
+Teacher forward  1 / grad-forward 0
+96 unique sample identities across 16 ranks x 6 stages
+fixed end_step_idx = 3
+```
+
+If any count/sample identity differs, the run is invalid regardless of wall time.
+
+## 1. Prepare identical checkout on both nodes
 
 ```bash
 git clone https://github.com/sliortega295-ops/H3-DMD-for-A100.git
 cd H3-DMD-for-A100
+git checkout agent/h3-a100-shared-backbone
 bash scripts/bootstrap_lightx2v.sh
 source .h3-a100-env
 ```
 
-Both nodes must report the same pinned LightX2V commit:
+The pinned LightX2V revision must be:
 
-```bash
-git -C "$LIGHTX2V_ROOT" rev-parse HEAD
-cat UPSTREAM_COMMIT
+```text
+d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be
 ```
 
 ## 2. Environment
-
-Use the CUDA/PyTorch/Diffusers environment required by the pinned LightX2V H3 trainer. In particular, the Diffusers build must contain `MiniMaxH3Transformer3DModel` with PEFT adapter and attention-backend APIs.
-
-Export identical shared paths on both nodes:
 
 ```bash
 export MINIMAX_H3_MODEL_PATH=/shared/models/MiniMax-H3
 export H3_PROMPT_CACHE=/shared/datasets/minimax_h3_prompt_cache
 export H3_OUTPUT_DIR=/shared/outputs/h3_dmd_a100
-export H3_ATTN_BACKEND=flash
+export H3_ATTN_BACKEND=_flash_3_hub
+export H3_BENCHMARK_SEED=42
 ```
 
-Optional NCCL settings depend on the cluster:
+Controlled runs require Diffusers `0.40.0.dev0` at source revision `9284607295a09f759aadd65ed08f48b35feea6d9`. `scripts/preflight.py` fails closed on source/backend mismatch.
 
-```bash
-export NCCL_SOCKET_IFNAME=<network-interface>
-export NCCL_IB_HCA=<ib-devices>
-export NCCL_DEBUG=WARN
-```
-
-Do not copy interface names from another cluster blindly.
+Cluster-specific NCCL variables may be set as needed, but do not copy interface/HCA names from another cluster blindly.
 
 ## 3. Preflight on both nodes
 
@@ -55,109 +58,77 @@ Do not copy interface names from another cluster blindly.
 python scripts/preflight.py --lightx2v-root "$LIGHTX2V_ROOT"
 ```
 
-Hard failures include:
+Failures before model construction must be classified separately from CUDA/host OOM.
 
-- wrong LightX2V commit;
-- fewer or more than 8 visible GPUs;
-- missing H3 Diffusers APIs;
-- wrong model layout;
-- missing prompt cache.
-
-Host-memory and unexpected-GPU messages are warnings so the report can still be collected.
-
-## 4. One-node smoke gate
-
-Run this before reserving two nodes for a long job:
+## 4. One-node smoke
 
 ```bash
 bash scripts/smoke_1node.sh 2>&1 | tee smoke.log
 ```
 
-Required pass conditions:
+Required:
 
-1. full H3 never attempts a pre-FSDP `.to(cuda)`;
-2. setup finishes on all 8 ranks without host/GPU OOM;
-3. one Student step is finite;
-4. five Fake optimizer steps complete;
-5. AdaLN stats show persistent cache entries and increasing hits;
-6. no rank divergence, collective timeout, or adapter-missing error.
+1. setup finishes on all 8 ranks;
+2. one Student + five Fake updates finish;
+3. matched census is `24/6/1` forward and `1/5` backward per rank;
+4. 48 unique sample identities are observed for the 8-rank smoke;
+5. AdaLN cache hits increase;
+6. no adapter-state or collective divergence.
 
-The smoke workload is 960×544, 40 frames, one training iteration. It validates control flow, not final memory at 1344×768×124.
+## 5. Primary two-node capacity gate
 
-## 5. Optional Nsight Systems trace
+Use the default world16 config and exactly one outer cycle first:
 
 ```bash
-bash scripts/profile_nsys.sh
+export H3_MAX_ITERS=1
+export H3_SAVE_EVERY=0
 ```
-
-Relevant NVTX ranges:
-
-- `h3/student_step`
-- `h3/critic_phase`
-- `h3/critic_prepare_5xG`
-- `h3/critic_update_F`
-
-Check that the five G rollouts form one contiguous region and that cross-node NCCL traffic is dominated by replica-gradient communication rather than every block's parameter all-gather.
-
-## 6. Two-node launch
-
-Choose a node-0 address reachable from node 1.
 
 Node 0:
 
 ```bash
 NODE_RANK=0 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 \
-  bash scripts/launch_2node.sh 2>&1 | tee node0.log
+  bash scripts/launch_2node.sh 2>&1 | tee node0.capacity.log
 ```
 
 Node 1:
 
 ```bash
 NODE_RANK=1 MASTER_ADDR=<node0-ip> MASTER_PORT=29500 \
-  bash scripts/launch_2node.sh 2>&1 | tee node1.log
+  bash scripts/launch_2node.sh 2>&1 | tee node1.capacity.log
 ```
 
-The launcher creates a 2×8 HSDP mesh. Do not change `NPROC_PER_NODE=8` without also changing `distributed.hybrid_shard.shard_size`.
+Do not reduce resolution, frames, LoRA rank, Fake update count, or end-step to make the gate fit.
 
-## 7. First full-resolution gate
+## 6. Five-cycle timing
 
-Before 1000 iterations, run a short full-resolution job:
+Only after the one-cycle capacity/correctness gate passes:
 
 ```bash
-export H3_MAX_ITERS=3
-export H3_SAVE_EVERY=1
-# launch both nodes as above
+export H3_MAX_ITERS=5
+export H3_SAVE_EVERY=0
 ```
 
-Inspect:
+Formal wall-clock measurement must exclude cold loading/FSDP construction. Synchronize CUDA/world16 immediately before the first Student update and immediately after the fifth cycle's fifth Fake optimizer update. Preserve per-cycle phase timings separately.
 
-- peak GPU memory from `[h3-a100][memory]` logs;
-- node host-memory peak;
-- finite Student/Fake losses;
-- checkpoint creation and same-topology resume;
-- AdaLN cache memory and hit counts;
-- iteration wall time and five critic updates.
+The matched census remains enabled during timing; its global sample check occurs after each cycle and is correctness evidence, not a license to change the compute graph.
 
-Then restart from the last checkpoint with a larger `H3_MAX_ITERS`.
+## 7. HSDP ablation
 
-## 8. Troubleshooting
+After the primary world16 result exists:
 
-### OOM before FSDP setup finishes
+```bash
+export CONFIG=$PWD/configs/minimax_h3_t2av_dmd_a100_2x8.yaml
+```
 
-This is a host-memory loading peak, not a CUDA activation problem. Confirm the custom model name is selected and logs say the full H3 checkpoint stayed on CPU. Close competing jobs and inspect per-rank RSS. The next engineering step is direct sharded/meta loading; reducing resolution will not fix initialization RAM.
+Run the same one-cycle capacity gate and five-cycle timing. HSDP is comparable only if the same matched census and world16 sample contract pass.
 
-### CUDA OOM during the first forward
+## 8. OOM follow-up order
 
-Start with the smoke config. Verify HSDP shard size is 8 and that all 8 GPUs are visible. Inspect whether FlashAttention fell back to native SDPA. Reduce frame count/canvas only for diagnosis; the paper configuration remains 1344×768×124.
+If the primary world16 shared-backbone exact run CUDA-OOMs, preserve the exact failure location/allocator counters and test memory mechanisms one at a time. Do not mix multiple changes in the first retry. Recommended order is selective activation checkpoint/offload policy first, then context/sequence parallelism if activation remains dominant. Sigma discretization/AdaLN weight dropping is a separate algorithmic ablation and not part of the exact matched baseline.
 
-### Different samples/noise inside an HSDP shard group
+If cold construction hits host/cgroup OOM, fix initialization (meta/direct sharded loading or shared immutable backing) without changing the timed workload.
 
-All ranks 0–7 must share data-parallel rank 0; ranks 8–15 must share data-parallel rank 1. The custom entrypoint is required—running upstream `lightx2v_train/train.py` bypasses this mapping and is incorrect for the 2-D mesh.
+## 9. Nsight
 
-### Hang during AdaLN precompute
-
-Each AdaLN projection is a separate FSDP unit and all ranks in the shard group must call it in the same order. A rank-specific exception before precompute usually appears as a later NCCL timeout; inspect the earliest rank log.
-
-### Resume failure
-
-The v1 checkpoint is same-topology only. Resume with the same 16 ranks, 2×8 mesh, upstream commit, model checkpoint, and LoRA configuration.
+Capture Nsight only after an unprofiled stable result exists. Profiled wall time is diagnostic, not the formal denominator. Keep CUDA compute, NCCL, H2D and D2H interval unions separate because they may overlap.
