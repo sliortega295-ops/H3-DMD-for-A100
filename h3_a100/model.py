@@ -37,6 +37,30 @@ FAKE_ADAPTER = "fake"
 BASE_ROLE = "teacher"
 
 
+class _H3CheckpointSegment(torch.nn.Module):
+    """A contiguous block group used by the bounded SAC candidate.
+
+    The modules inside the group remain individually ``fully_shard``-ed.  Only
+    the activation-checkpoint boundary changes: the upstream H3 forward sees a
+    segment as one callable and therefore saves one input boundary instead of
+    one boundary per block.  This is deliberately a small wrapper rather than
+    a replacement transformer implementation, so the block math and call
+    sequence remain upstream-defined.
+    """
+
+    def __init__(self, blocks: list[torch.nn.Module], start: int):
+        super().__init__()
+        if not blocks:
+            raise ValueError("An H3 activation-checkpoint segment cannot be empty")
+        self.blocks = torch.nn.ModuleList(blocks)
+        self.start = int(start)
+
+    def forward(self, hidden_states, temb, adaln_indices, rotary_emb):
+        for block in self.blocks:
+            hidden_states = block(hidden_states, temb, adaln_indices, rotary_emb)
+        return hidden_states
+
+
 def _configure_local_flash_attn3() -> None:
     """Bind the pinned local FlashAttention-3 build without Hub access.
 
@@ -194,6 +218,42 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
             counts[FAKE_ADAPTER],
         )
 
+    def configure_activation_checkpoint_segments(self, segment_size: int) -> None:
+        """Install the bounded SAC grouping before FSDP2 wrapping.
+
+        ``segment_size=1`` is the pinned upstream behavior.  Larger values
+        only alter checkpoint boundaries; every contained transformer block is
+        still passed to FSDP2 separately by :meth:`fsdp2_shard_plan`.
+        """
+
+        segment_size = int(segment_size)
+        if segment_size < 1:
+            raise ValueError(f"activation checkpoint segment_size must be >= 1, got {segment_size}")
+        transformer = self.denoiser_module()
+        if self.is_fsdp2_wrapped():
+            raise RuntimeError("Activation-checkpoint segmentation must be configured before FSDP2 wrapping")
+        blocks = list(transformer.transformer_blocks)
+        if not blocks:
+            raise RuntimeError("MiniMax-H3 transformer has no transformer blocks")
+        if segment_size == 1:
+            logger.info("[h3-a100] activation checkpoint segment_size=1 (upstream per-block policy)")
+            self._activation_checkpoint_segment_size = 1
+            return
+        if any(isinstance(block, _H3CheckpointSegment) for block in blocks):
+            raise RuntimeError("Activation checkpoint segmentation was configured more than once")
+        segments = [
+            _H3CheckpointSegment(blocks[start : start + segment_size], start)
+            for start in range(0, len(blocks), segment_size)
+        ]
+        transformer.transformer_blocks = torch.nn.ModuleList(segments)
+        self._activation_checkpoint_segment_size = segment_size
+        logger.info(
+            "[h3-a100] SAC activation checkpoint segments enabled segment_size={} blocks={} segments={}",
+            segment_size,
+            len(blocks),
+            len(segments),
+        )
+
     def _add_named_adapter(self, adapter_name: str, config: LoraConfig) -> None:
         transformer = self.denoiser_module()
         if not hasattr(transformer, "add_adapter"):
@@ -341,7 +401,12 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
             return super().fsdp2_shard_plan(fsdp_config)
 
         token_refiner_blocks = list(transformer.token_refiner.refiner_blocks)
-        transformer_blocks = list(transformer.transformer_blocks)
+        transformer_blocks = []
+        for block_or_segment in transformer.transformer_blocks:
+            if isinstance(block_or_segment, _H3CheckpointSegment):
+                transformer_blocks.extend(list(block_or_segment.blocks))
+            else:
+                transformer_blocks.append(block_or_segment)
         return [
             # precompute_adaln calls the time MLP directly after FSDP wrapping.
             {"module": transformer.time_embedder, "reshard_after_forward": True},

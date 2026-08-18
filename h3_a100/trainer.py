@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import torch
 from loguru import logger
 
@@ -59,6 +61,18 @@ class MiniMaxH3A100DmdTrainer(
             expected_world_size=self.matched_expected_world_size,
             require_unique_samples=self.matched_require_unique_samples,
         )
+        checkpointing = a100.get("activation_checkpointing", {})
+        self.activation_checkpoint_segment_size = int(
+            os.environ.get(
+                "H3_ACTIVATION_CHECKPOINT_SEGMENT",
+                checkpointing.get("segment_size", 1),
+            )
+        )
+        if self.activation_checkpoint_segment_size < 1:
+            raise ValueError(
+                "H3_ACTIVATION_CHECKPOINT_SEGMENT must be >= 1, got "
+                f"{self.activation_checkpoint_segment_size}"
+            )
         self._validate_matched_static_contract()
         self._score_serial = 0
 
@@ -93,6 +107,7 @@ class MiniMaxH3A100DmdTrainer(
             cache_enabled=self.adaln_cache_enabled,
             max_dynamic_cache_keys=self.adaln_dynamic_keys,
         )
+        model.configure_activation_checkpoint_segments(self.activation_checkpoint_segment_size)
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)
@@ -137,6 +152,10 @@ class MiniMaxH3A100DmdTrainer(
             model.is_fsdp2_wrapped(),
             self.reorder_critic_rollouts,
             self.matched_compute_enabled,
+        )
+        logger.info(
+            "[h3-a100] activation_checkpoint_segment_size={}",
+            self.activation_checkpoint_segment_size,
         )
 
     def _validate_reorder_contract(self) -> None:
