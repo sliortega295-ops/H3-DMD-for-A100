@@ -6,6 +6,7 @@ import contextlib
 import contextvars
 import os
 from collections.abc import Iterator, Mapping
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -34,6 +35,36 @@ from .adaln_cache import (
 STUDENT_ADAPTER = "student"
 FAKE_ADAPTER = "fake"
 BASE_ROLE = "teacher"
+
+
+def _configure_local_flash_attn3() -> None:
+    """Bind the pinned local FlashAttention-3 build without Hub access.
+
+    The pinned Diffusers ``_flash_3_hub`` backend normally resolves version 1
+    through the Hugging Face Hub on every fresh process.  The BAAI nodes are
+    intentionally offline, but the exact kernel snapshot is already present
+    in the shared benchmark assets.  Binding the same module through
+    ``get_local_kernel`` changes only how the immutable kernel is located; it
+    does not change the attention backend or workload semantics.
+    """
+
+    local_path = os.environ.get("H3_FLASH_ATTN3_LOCAL_PATH")
+    if not local_path:
+        return
+    from kernels.utils import get_local_kernel
+    from diffusers.models.attention_dispatch import (
+        AttentionBackendName,
+        _HUB_KERNELS_REGISTRY,
+    )
+
+    config = _HUB_KERNELS_REGISTRY[AttentionBackendName._FLASH_3_HUB]
+    if config.kernel_fn is not None:
+        return
+    module = get_local_kernel(Path(local_path), "flash_attn3")
+    config.kernel_fn = module.flash_attn_func
+    config.wrapped_forward_fn = module.flash_attn_interface._flash_attn_forward
+    config.wrapped_backward_fn = module.flash_attn_interface._flash_attn_backward
+    logger.info("[h3-a100] bound local FlashAttention-3 kernel: {}", local_path)
 
 
 def _lora_config(mapping: Mapping[str, Any]) -> LoraConfig:
@@ -89,6 +120,7 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         self.audio_latent_channels = int(config.get("audio_latent_channels", 32))
         self.vae_spatial_scale_factor = int(config.get("vae_spatial_scale_factor", 16))
         self.use_autocast = bool(config.get("use_autocast", False))
+        _configure_local_flash_attn3()
         self.transformer = load_minimax_h3_transformer(
             self.pretrained_model_path,
             torch_dtype=self.transformer_param_dtype,

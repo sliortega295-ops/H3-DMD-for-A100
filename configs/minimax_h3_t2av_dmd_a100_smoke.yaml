@@ -83,7 +83,10 @@ training:
     fake_update_ratio: 5
     height: 544
     width: 960
-    num_frames: 40
+    # MiniMax-H3 temporal packing requires 17*n+5 frames; 39 is the
+    # smallest structurally valid diagnostic canvas near the original smoke
+    # size.  The primary 124-frame contract remains unchanged.
+    num_frames: 39
     renoise_sigma_min: 0.02
     renoise_sigma_max: 0.98
     warp_denoising_step: false
