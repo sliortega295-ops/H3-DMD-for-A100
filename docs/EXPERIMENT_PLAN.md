@@ -1,82 +1,70 @@
 # Validation and ablation plan
 
-The first goal is not to claim speedup; it is to establish semantic correctness and a stable two-node baseline. Run the following gates in order.
+The first goal is a **controlled world16 MiniMax comparison**, not an unconstrained speedup search. Formal timing is invalid unless model/data/loss/update semantics and application-level DiT counts match the DMD-System reference.
 
-## A. Static and CPU unit tests
+## A. Matched-compute gate
 
-```bash
-bash scripts/run_unit_tests.sh
+Primary config:
+
+```text
+configs/minimax_h3_t2av_dmd_a100_world16.yaml
 ```
 
-Covered invariants:
+Per outer cycle and per rank, require exactly:
 
-- frozen AdaLN required;
-- persistent cache is exact and does not recompute;
-- dynamic cache is reused and evicted correctly;
-- 2×8 rank mapping;
-- pinned upstream/config/script contracts.
+```text
+Student DiT forwards          24
+Fake DiT forwards              6
+Teacher DiT forwards           1
+Student grad-enabled forwards  1
+Fake grad-enabled forwards     5
+Teacher grad-enabled forwards  0
+Student backward graphs        1
+Fake backward graphs           5
+fixed end_step_idx              3
+```
 
-## B. One-node functional matrix
+Across world16, the six stage samples must yield 96 distinct rank-qualified identities. If any census differs, do not report wall time as a matched result.
 
-Use the smoke canvas and one iteration.
+## B. Source/hardware preflight
 
-| Variant | Shared backbone | AdaLN cache | 5G→5F reorder | Purpose |
-|---|---:|---:|---:|---|
-| B0 | yes | off | off | shared-backbone control |
-| B1 | yes | on | off | isolate AdaLN cache |
-| B2 | yes | on | on | complete optimized control flow |
+Controlled runs pin the same LightX2V/attention environment as the DMD-System reference. Run `scripts/preflight.py` on both nodes before model construction. Treat launcher/source/shared-filesystem failures separately from CUDA/host OOM.
 
-For the first implementation, toggles can be changed in a copied YAML. Use the same prompt cache and seed.
+## C. One-node smoke
 
-Record:
+Use the smoke canvas for one Student1/Fake5 cycle. The smoke must pass the same per-rank `24/6/1` forward and `1/5` backward census before any full-resolution run.
 
-- Student/Fake losses;
-- Student/Fake LoRA gradient norms;
-- generated latent checksums before the first optimizer step;
-- peak GPU and host memory;
-- wall time per Student phase and critic phase;
-- AdaLN cache hits/misses/bytes.
+## D. Full-resolution world16 capacity gate
 
-Expected numerical relation:
+Run one exact outer cycle at 1344×768×124 with world16 FSDP2. Record peak allocated/reserved HBM, driver free memory, host/cgroup memory, finite losses, adapter correctness and matched census.
 
-- cache on/off should be bitwise or extremely close in the same dtype because cached tensors are outputs of the original frozen projections;
-- reorder on/off should preserve the five optimizer-step semantics, but floating-point execution order and asynchronous collectives may produce small differences over multiple iterations.
+Do not reduce resolution, frames, LoRA rank, Fake update count, rollout evaluations, or precision to make it fit.
 
-## C. HSDP correctness
+## E. Five-cycle formal timing
 
-Compare one-node 1×8 and two-node 2×8:
+After capacity passes, run five consecutive outer cycles with checkpoint/inference side effects disabled. Cold checkout/model load/FSDP construction are excluded. Synchronize world16/CUDA at the timing boundaries and report both per-cycle and five-cycle wall time.
 
-- ranks inside each shard group must log identical end-step/sigma/noise checksums;
-- the two replicas should receive different dataset samples;
-- gradients must reduce across replicas;
-- losses should equal the average of the two replica samples, within distributed floating-point tolerance.
+Run at least three independent unprofiled repeats for the final winning exact configuration; report all raw values, median and dispersion.
 
-## D. Full-resolution short run
+## F. Systems ablations
 
-Run 3–10 iterations at 1344×768×124 before a long job. Validate checkpoint save/resume and capture an Nsight Systems trace.
+Change one systems dimension at a time while preserving the matched census.
 
-## E. Performance ablations
+| ID | Placement | Shared backbone | AdaLN cache | 5G→5F reorder | Purpose |
+|---|---|---:|---:|---:|---|
+| P0 | world16 FSDP2 | yes | on | on | primary controlled candidate |
+| P1 | world16 FSDP2 | yes | off | on | isolate AdaLN cache |
+| P2 | world16 FSDP2 | yes | on | off | isolate phase clustering |
+| P3 | 2×8 HSDP | yes | on | on | placement/communication ablation |
 
-| ID | Topology | AdaLN | Reorder | Metric of interest |
-|---|---|---|---|---|
-| P0 | 16-way 1-D FSDP | on | on | inter-node parameter all-gather cost |
-| P1 | 2×8 HSDP | on | on | preferred topology |
-| P2 | 2×8 HSDP | off | on | AdaLN compute/communication contribution |
-| P3 | 2×8 HSDP | on | off | role-locality contribution |
+HSDP must retain 16 independent global-rank samples/RNG streams; it is not allowed to collapse global batch16 into two node-level samples.
 
-Report:
+## G. OOM follow-up
 
-- samples or iterations per hour;
-- Student and five-Fake phase wall times;
-- NCCL bytes/time split by intra-node vs inter-node transport;
-- GPU active time and memory bandwidth;
-- peak allocated/reserved CUDA memory;
-- host-memory peak during initialization and steady state.
+If the exact primary candidate OOMs, preserve the failure evidence and change one memory mechanism per retry. Prefer memory mechanisms that do not alter the DMD objective: checkpoint/SAC policy, selective activation offload, then context/sequence parallelism if activation remains dominant. Keep continuous renoise sigma for the exact path.
 
-## F. Follow-on work after P1 is stable
+A finite sigma grid plus permanent AdaLN weight dropping is a separate algorithmic/memory ablation, not the exact matched baseline.
 
-1. Direct safetensor-to-DTensor/meta loading to remove eight full CPU copies per node.
-2. CPU optimizer-state offload if rank-128 LoRA optimizer memory is material.
-3. Activation offload only for the final differentiable rollout step and Fake forward.
-4. Context parallelism for longer clips/canvases.
-5. Quantized frozen backbone with BF16 LoRA path.
+## H. Profiling
+
+Only after unprofiled timing exists, capture one representative Nsight run. Report compute/NCCL/H2D/D2H interval unions independently because they can overlap. Never substitute profiled wall time for the formal denominator.
