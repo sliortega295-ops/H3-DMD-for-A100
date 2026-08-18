@@ -99,14 +99,24 @@ class H3A100LoopMixin:
             conditions = self._encode_conditions(sample)
             latent_shape = self._latent_shape(sample)
             self._set_shared_gradient_sync(micro_idx == grad_accum_iters - 1)
-            result = self.forward_student_loss(latent_shape, conditions, current_iter=current_iter)
-            self.shared_model.transformer.train()
-            with self.shared_model.role_scope(STUDENT_ADAPTER), self.shared_model.adaln_scope(
-                result["backward_key"], persistent=True
-            ):
-                if self.matched_compute_enabled:
-                    self.matched_cycle_census.note_backward(STUDENT_ROLE)
-                (result["loss"] / grad_accum_iters).backward()
+            with self._activation_offload_scope("student") as offload:
+                result = self.forward_student_loss(latent_shape, conditions, current_iter=current_iter)
+                if offload is not None:
+                    # Keep original-forward handles available for backward,
+                    # but do not offload checkpoint-replay intermediates.
+                    offload.begin_backward()
+                self.shared_model.transformer.train()
+                with self.shared_model.role_scope(STUDENT_ADAPTER), self.shared_model.adaln_scope(
+                    result["backward_key"], persistent=True
+                ):
+                    if self.matched_compute_enabled:
+                        self.matched_cycle_census.note_backward(STUDENT_ROLE)
+                    (result["loss"] / grad_accum_iters).backward()
+            if offload is not None:
+                logger.info(
+                    "[h3-a100][activation-offload] component=student stats={}",
+                    offload.stats,
+                )
             running_dmd += result["dmd"].item() / grad_accum_iters
 
         sync_sequence_parallel_gradients(self.trainable_params)
@@ -155,14 +165,23 @@ class H3A100LoopMixin:
         fake_loss_value = 0.0
         for micro_idx, item in enumerate(group):
             self._set_shared_gradient_sync(micro_idx == len(group) - 1)
-            loss_fake = self.fake_loss(item)
-            self.shared_model.transformer.train()
-            with self.shared_model.role_scope(FAKE_ADAPTER), self.shared_model.adaln_scope(
-                item.cache_key, persistent=False
-            ):
-                if self.matched_compute_enabled:
-                    self.matched_cycle_census.note_backward(FAKE_ROLE)
-                (loss_fake / len(group)).backward()
+            with self._activation_offload_scope(f"fake_{micro_idx}") as offload:
+                loss_fake = self.fake_loss(item)
+                if offload is not None:
+                    offload.begin_backward()
+                self.shared_model.transformer.train()
+                with self.shared_model.role_scope(FAKE_ADAPTER), self.shared_model.adaln_scope(
+                    item.cache_key, persistent=False
+                ):
+                    if self.matched_compute_enabled:
+                        self.matched_cycle_census.note_backward(FAKE_ROLE)
+                    (loss_fake / len(group)).backward()
+            if offload is not None:
+                logger.info(
+                    "[h3-a100][activation-offload] component=fake_{} stats={}",
+                    micro_idx,
+                    offload.stats,
+                )
             self.shared_model.drop_adaln_key(item.cache_key)
             fake_loss_value += loss_fake.item() / len(group)
 

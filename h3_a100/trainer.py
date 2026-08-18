@@ -12,6 +12,7 @@ from lightx2v_train.trainers.dmd.minimax_h3_trainer import MiniMaxH3T2AVDmdTrain
 from lightx2v_train.utils.registry import TRAINER_REGISTER
 
 from .checkpointing import H3A100CheckpointMixin
+from .activation_offload import maybe_saved_tensor_offload
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -73,6 +74,20 @@ class MiniMaxH3A100DmdTrainer(
                 "H3_ACTIVATION_CHECKPOINT_SEGMENT must be >= 1, got "
                 f"{self.activation_checkpoint_segment_size}"
             )
+        # This is a bounded capacity candidate, not part of the default
+        # controlled path.  It is enabled only by an explicit environment
+        # variable so the checkpoint-only baseline remains unchanged.
+        self.activation_offload_enabled = os.environ.get(
+            "H3_ACTIVATION_OFFLOAD", "0"
+        ).lower() in {"1", "true", "yes", "on"}
+        self.activation_offload_min_bytes = int(
+            os.environ.get("H3_ACTIVATION_OFFLOAD_MIN_BYTES", 128 * 1024 * 1024)
+        )
+        self.activation_offload_pin_memory = os.environ.get(
+            "H3_ACTIVATION_OFFLOAD_PIN_MEMORY", "1"
+        ).lower() in {"1", "true", "yes", "on"}
+        if self.activation_offload_min_bytes < 0:
+            raise ValueError("H3_ACTIVATION_OFFLOAD_MIN_BYTES must be >= 0")
         self._validate_matched_static_contract()
         self._score_serial = 0
 
@@ -156,6 +171,21 @@ class MiniMaxH3A100DmdTrainer(
         logger.info(
             "[h3-a100] activation_checkpoint_segment_size={}",
             self.activation_checkpoint_segment_size,
+        )
+        logger.info(
+            "[h3-a100] activation_offload enabled={} min_bytes={} pin_memory={}",
+            self.activation_offload_enabled,
+            self.activation_offload_min_bytes,
+            self.activation_offload_pin_memory,
+        )
+
+    def _activation_offload_scope(self, logical_component: str):
+        return maybe_saved_tensor_offload(
+            self.shared_model.denoiser_module(),
+            enabled=self.activation_offload_enabled,
+            logical_component=logical_component,
+            min_offload_bytes=self.activation_offload_min_bytes,
+            pin_memory=self.activation_offload_pin_memory,
         )
 
     def _validate_reorder_contract(self) -> None:
