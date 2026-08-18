@@ -1,0 +1,143 @@
+"""A100-oriented shared-backbone DMD trainer registration and setup."""
+
+from __future__ import annotations
+
+import torch
+from loguru import logger
+
+from lightx2v_train.runtime.parallel import apply_parallel
+from lightx2v_train.trainers.dmd.minimax_h3_trainer import MiniMaxH3T2AVDmdTrainer
+from lightx2v_train.utils.registry import TRAINER_REGISTER
+
+from .checkpointing import H3A100CheckpointMixin
+from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
+from .trainer_loop import H3A100LoopMixin
+from .trainer_runtime import H3A100RuntimeMixin
+
+
+@TRAINER_REGISTER("minimax_h3_t2av_dmd_a100")
+class MiniMaxH3A100DmdTrainer(
+    H3A100CheckpointMixin,
+    H3A100LoopMixin,
+    H3A100RuntimeMixin,
+    MiniMaxH3T2AVDmdTrainer,
+):
+    """One physical H3 backbone, two LoRAs, cached AdaLN, reordered critic."""
+
+    trainer_name = "minimax_h3_t2av_dmd_a100"
+    allowed_model_names = {"minimax_h3_t2av_a100"}
+
+    def __init__(self, config):
+        super().__init__(config)
+        if self.student_train_type != "lora" or self.fake_train_type != "lora":
+            raise ValueError("H3 A100 shared-backbone training requires student/fake train_type=lora")
+        if self.ida_trick.enabled:
+            raise ValueError("H3 A100 shared-backbone trainer does not yet support SenseFlow IDA")
+
+        a100 = self.training_config.get("a100", {})
+        cache = a100.get("adaln_cache", {})
+        reorder = a100.get("critic_rollout_reorder", {})
+        self.adaln_cache_enabled = bool(cache.get("enabled", True))
+        self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
+        self.reorder_critic_rollouts = bool(reorder.get("enabled", True))
+        self.critic_rollout_group_size = int(reorder.get("group_size", self.fake_update_ratio))
+        if self.critic_rollout_group_size != self.fake_update_ratio:
+            raise ValueError(
+                "critic_rollout_reorder.group_size must equal "
+                f"fake_update_ratio={self.fake_update_ratio} to preserve optimizer-step semantics"
+            )
+        self._score_serial = 0
+
+    @property
+    def shared_model(self) -> MiniMaxH3A100Model:
+        if not isinstance(self.model, MiniMaxH3A100Model):
+            raise TypeError(f"Expected MiniMaxH3A100Model, got {type(self.model)!r}")
+        return self.model
+
+    def setup(self, resume_ckpt_path=None):
+        model = self.shared_model
+        model.prepare_shared_backbone(
+            student_lora=self.student_lora_config,
+            fake_lora=self.fake_lora_config,
+            cache_enabled=self.adaln_cache_enabled,
+            max_dynamic_cache_keys=self.adaln_dynamic_keys,
+        )
+        self._validate_reorder_contract()
+        if resume_ckpt_path is not None:
+            self._load_role_weights_before_fsdp(resume_ckpt_path)
+
+        apply_parallel(model, self.config)
+        self._release_full_cpu_checkpoint_storage()
+        if self.gradient_checkpointing:
+            model.enable_gradient_checkpointing()
+
+        self.trainable_params = model.role_parameters(STUDENT_ADAPTER)
+        self.fake_trainable_params = model.role_parameters(FAKE_ADAPTER)
+        self._validate_shared_parameter_contract()
+        self.optimizer = self._build_optimizer(self.trainable_params)
+        self.fake_optimizer = self._build_optimizer(
+            self.fake_trainable_params,
+            {
+                "learning_rate": self.fake_optimizer_learning_rate,
+                "adam_beta1": self.fake_optimizer_adam_beta1,
+                "adam_beta2": self.fake_optimizer_adam_beta2,
+                "weight_decay": self.fake_optimizer_weight_decay,
+                "adam_epsilon": self.fake_optimizer_adam_epsilon,
+            },
+        )
+        self.lr_scheduler = self._build_lr_scheduler(self.optimizer)
+        self.fake_lr_scheduler = self._build_lr_scheduler(
+            self.fake_optimizer,
+            num_warmup_steps=0,
+            num_training_steps=max(1, self.max_train_iters * self.fake_update_ratio),
+        )
+
+        self.fake_model = model
+        self.teacher_model = model
+        if resume_ckpt_path is not None:
+            self._load_rank_state_after_fsdp(resume_ckpt_path)
+
+        self._log_cuda_memory("after_setup")
+        logger.info(
+            "[h3-a100] setup physical_backbones=1 logical_roles=3 "
+            "student_params={} fake_params={} fsdp={} critic_reorder={}",
+            sum(p.numel() for p in self.trainable_params),
+            sum(p.numel() for p in self.fake_trainable_params),
+            model.is_fsdp2_wrapped(),
+            self.reorder_critic_rollouts,
+        )
+
+    def _validate_reorder_contract(self) -> None:
+        if not self.reorder_critic_rollouts:
+            return
+        stochastic_dropout = [
+            (name, module.p)
+            for name, module in self.shared_model.denoiser_module().named_modules()
+            if isinstance(module, torch.nn.Dropout) and float(module.p) != 0.0
+        ]
+        if stochastic_dropout:
+            preview = ", ".join(f"{name}:p={prob}" for name, prob in stochastic_dropout[:6])
+            raise RuntimeError(
+                "Critic rollout reordering requires deterministic H3 forwards; "
+                f"found nonzero dropout modules: {preview}"
+            )
+
+    def _validate_shared_parameter_contract(self) -> None:
+        student_ids = {id(parameter) for parameter in self.trainable_params}
+        fake_ids = {id(parameter) for parameter in self.fake_trainable_params}
+        overlap = student_ids & fake_ids
+        if overlap:
+            raise RuntimeError(f"Student/Fake optimizers share {len(overlap)} parameter objects")
+        non_lora = [
+            name
+            for name, parameter in self.shared_model.denoiser_module().named_parameters()
+            if parameter.requires_grad and "lora_" not in name
+        ]
+        if non_lora:
+            raise RuntimeError(
+                f"Shared H3 base has trainable non-LoRA parameters: {', '.join(non_lora[:6])}"
+            )
+        if not all(parameter.requires_grad for parameter in self.trainable_params):
+            raise RuntimeError("Student adapter contains frozen parameters after FSDP wrapping")
+        if not all(parameter.requires_grad for parameter in self.fake_trainable_params):
+            raise RuntimeError("Fake adapter contains frozen parameters after FSDP wrapping")

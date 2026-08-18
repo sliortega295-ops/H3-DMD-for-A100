@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.h3-a100-env
+third_party/
+output_train/
+profiles/
+*.nsys-rep
+*.sqlite
