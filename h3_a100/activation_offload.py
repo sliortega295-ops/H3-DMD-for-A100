@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 import torch
+from loguru import logger
 
 
 def _storage_key(tensor: torch.Tensor) -> tuple[str, int, int]:
@@ -157,6 +158,12 @@ class SelectiveSavedTensorOffload:
             with torch.autograd.graph.saved_tensors_hooks(self._pack, self._unpack):
                 yield self
         finally:
+            logger.info(
+                "[h3-a100][activation-offload] component={} phase={} stats={}",
+                self.logical_component,
+                self._phase,
+                self.stats,
+            )
             # Release CPU copies before returning to the next logical update.
             self._handles.clear()
             gc.collect()
