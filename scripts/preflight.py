@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-fast environment checks before allocating a two-node H3 DMD run."""
+"""Fail-fast environment/source checks before a controlled H3 DMD run."""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+EXPECTED_DIFFUSERS_VERSION = "0.40.0.dev0"
+EXPECTED_DIFFUSERS_SOURCE_REVISION = "9284607295a09f759aadd65ed08f48b35feea6d9"
+EXPECTED_ATTENTION_BACKEND = "_flash_3_hub"
 
 
 def _gib(value: int) -> float:
@@ -30,10 +34,20 @@ def _host_memory_gib() -> float | None:
 def _git_head(path: Path) -> str | None:
     try:
         return subprocess.check_output(
-            ["git", "-C", str(path), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+def _module_source_revision(module) -> str | None:
+    module_path = Path(getattr(module, "__file__", "")).resolve()
+    for parent in (module_path.parent, *module_path.parents):
+        if (parent / ".git").exists():
+            return _git_head(parent)
+    return None
 
 
 def main() -> int:
@@ -57,6 +71,9 @@ def main() -> int:
         "repo_root": str(repo_root),
         "lightx2v_root": str(lightx2v_root),
         "expected_upstream_commit": expected_commit,
+        "expected_diffusers_version": EXPECTED_DIFFUSERS_VERSION,
+        "expected_diffusers_source_revision": EXPECTED_DIFFUSERS_SOURCE_REVISION,
+        "expected_attention_backend": EXPECTED_ATTENTION_BACKEND,
     }
 
     if not lightx2v_root.is_dir():
@@ -66,6 +83,14 @@ def main() -> int:
         report["lightx2v_head"] = head
         if head != expected_commit:
             errors.append(f"LightX2V HEAD is {head}; expected pinned commit {expected_commit}")
+
+    actual_attention_backend = os.environ.get("H3_ATTN_BACKEND", EXPECTED_ATTENTION_BACKEND)
+    report["attention_backend"] = actual_attention_backend
+    if actual_attention_backend != EXPECTED_ATTENTION_BACKEND:
+        errors.append(
+            f"Controlled timing requires H3_ATTN_BACKEND={EXPECTED_ATTENTION_BACKEND}, "
+            f"got {actual_attention_backend}"
+        )
 
     try:
         import torch
@@ -95,23 +120,33 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover - cluster-only diagnostics
         errors.append(f"PyTorch/FSDP2 check failed: {exc}")
 
-    for package in ("diffusers", "peft", "safetensors", "omegaconf", "flash_attn"):
+    for package in ("diffusers", "peft", "safetensors", "omegaconf"):
         try:
             report[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
-            if package == "flash_attn":
-                warnings.append("flash_attn is not installed; set H3_ATTN_BACKEND to an available backend")
-            else:
-                errors.append(f"Required package is missing: {package}")
+            errors.append(f"Required package is missing: {package}")
 
     try:
         diffusers = importlib.import_module("diffusers")
+        actual_version = str(getattr(diffusers, "__version__", ""))
+        actual_revision = _module_source_revision(diffusers)
+        report["diffusers_version"] = actual_version
+        report["diffusers_source_revision"] = actual_revision
+        if actual_version != EXPECTED_DIFFUSERS_VERSION:
+            errors.append(
+                f"Diffusers version is {actual_version}; expected {EXPECTED_DIFFUSERS_VERSION}"
+            )
+        if actual_revision != EXPECTED_DIFFUSERS_SOURCE_REVISION:
+            errors.append(
+                "Diffusers source revision is "
+                f"{actual_revision}; expected {EXPECTED_DIFFUSERS_SOURCE_REVISION}"
+            )
         cls = getattr(diffusers, "MiniMaxH3Transformer3DModel")
         for method in ("add_adapter", "set_adapter", "disable_adapters", "set_attention_backend"):
             if not hasattr(cls, method):
                 errors.append(f"Diffusers MiniMaxH3Transformer3DModel lacks {method}()")
     except Exception as exc:
-        errors.append(f"MiniMax-H3 Diffusers API check failed: {exc}")
+        errors.append(f"MiniMax-H3 Diffusers API/source check failed: {exc}")
 
     model_root = Path(os.environ.get("MINIMAX_H3_MODEL_PATH", "/models/MiniMax-H3"))
     transformer_config = model_root / "transformer" / "config.json"
@@ -135,8 +170,7 @@ def main() -> int:
     report["host_memory_gib"] = host_memory
     if host_memory is not None and host_memory < args.min_host_memory_gib:
         warnings.append(
-            f"Host RAM is {host_memory:.1f} GiB; CPU-first loading of eight 61.7-GB ranks is "
-            f"validated for roughly >= {args.min_host_memory_gib:.0f} GiB per node"
+            f"Host RAM is {host_memory:.1f} GiB; current CPU-first loader may have a high cold-start peak"
         )
 
     report["warnings"] = warnings
