@@ -61,6 +61,7 @@ class AdaLNCacheController:
         self._scope: contextvars.ContextVar[_Scope] = contextvars.ContextVar(
             "h3_a100_adaln_scope", default=_Scope(None, False)
         )
+        self._last_scope = _Scope(None, False)
         self._hits = 0
         self._misses = 0
         self._stores = 0
@@ -69,6 +70,7 @@ class AdaLNCacheController:
     @contextlib.contextmanager
     def scope(self, key: CacheKey | None, *, persistent: bool = False) -> Iterator[None]:
         token = self._scope.set(_Scope(key, bool(persistent)))
+        self._last_scope = _Scope(key, bool(persistent))
         if key is not None and persistent:
             self._persistent.add(key)
         try:
@@ -86,6 +88,11 @@ class AdaLNCacheController:
         """
 
         return self._scope.get()
+
+    def last_scope(self) -> _Scope:
+        """Return the most recently entered scope for checkpoint replay."""
+
+        return self._last_scope
 
     def get_or_compute(
         self,

@@ -60,6 +60,8 @@ class _H3CheckpointSegment(torch.nn.Module):
     def forward(self, hidden_states, temb, adaln_indices, rotary_emb):
         controller = self._adaln_controller
         active = controller.current_scope()
+        if active.key is None:
+            active = controller.last_scope()
         if active.key is not None:
             # The original checkpoint forward has the exact request scope.
             # Save it on this segment so replay can restore it even though
