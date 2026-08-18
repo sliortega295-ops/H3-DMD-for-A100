@@ -1,7 +1,7 @@
 {
   "status": "PRIMARY_CAPACITY_BLOCKED",
   "formal_full5": "NOT_RUN",
-  "source_head": "f00ef38406fcfeea06e45567482ecc898df192aa",
+  "source_head": "1dd4a7b607b5a575d10e7bc17564251c7ac72979",
   "lightx2v_head": "d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be",
   "contract": {
     "world_size": 16,

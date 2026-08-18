@@ -18,7 +18,7 @@ one-cycle capacity/correctness gate.
 ## Source and environment identity
 
 - H3-DMD-for-A100 branch: `agent/h3-a100-shared-backbone`
-- current source HEAD: `f00ef38406fcfeea06e45567482ecc898df192aa`
+- current source HEAD: `1dd4a7b607b5a575d10e7bc17564251c7ac72979`
 - pinned LightX2V: `d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be`
 - Torch: 2.10.0+cu128; CUDA runtime 12.8; driver 535.161.08
 - Diffusers: 0.40.0.dev0, source `9284607295a09f759aadd65ed08f48b35feea6d9`
