@@ -1,3 +1,5 @@
+# Secondary systems ablation: same world16 compute/data contract as the primary
+# config, but parameters use a 2x8 HSDP mesh to keep all-gathers node-local.
 model:
   name: minimax_h3_t2av_a100
   pretrained_model_name_or_path: ${oc.env:MINIMAX_H3_MODEL_PATH,/models/MiniMax-H3}
@@ -9,9 +11,7 @@ model:
   video_latent_channels: 24
   audio_latent_channels: 32
   vae_spatial_scale_factor: 16
-  # A100/A800: Diffusers FlashAttention-2. Use "flash_hub" only when the
-  # kernels package is available locally.
-  attention_backend: ${oc.env:H3_ATTN_BACKEND,flash}
+  attention_backend: ${oc.env:H3_ATTN_BACKEND,_flash_3_hub}
 
 distributed:
   backend: nccl
@@ -21,7 +21,6 @@ distributed:
     size: 1
   hybrid_shard:
     enabled: true
-    # Two nodes x eight GPUs: replicate across nodes, shard inside each node.
     shard_size: 8
   fsdp2:
     enabled: true
@@ -29,7 +28,6 @@ distributed:
       root_reshard: false
       block_reshard: true
     mixed_precision:
-      # Preserve H3's mixed FP32/BF16 checkpoint contract.
       param_dtype: null
       reduce_dtype: fp32
       output_dtype: null
@@ -40,7 +38,7 @@ data:
     name: latent_dataset
     data_path: ${oc.env:H3_PROMPT_CACHE,/datasets/minimax_h3_prompt_cache}
     batch_size: 1
-    num_workers: 1
+    num_workers: 2
     pin_memory: true
     shuffle: true
     drop_last: true
@@ -53,14 +51,14 @@ scheduler:
 
 training:
   method: minimax_h3_t2av_dmd_a100
-  seed: 42
-  max_train_iters: ${oc.decode:${oc.env:H3_MAX_ITERS,1000}}
+  seed: ${oc.decode:${oc.env:H3_BENCHMARK_SEED,42}}
+  max_train_iters: ${oc.decode:${oc.env:H3_MAX_ITERS,5}}
   gradient_accumulation_iters: 1
   gradient_checkpointing: true
   max_grad_norm: 1.0
   lr_scheduler: constant
   lr_warmup_iters: 0
-  save_every_iters: ${oc.decode:${oc.env:H3_SAVE_EVERY,100}}
+  save_every_iters: ${oc.decode:${oc.env:H3_SAVE_EVERY,0}}
   save_total_limit: 3
   minimax_h3:
     video_flow_shift: 6.0
@@ -69,13 +67,16 @@ training:
     audio_loss_weight: 1.0
     latent_dtype: fp32
   a100:
+    matched_compute:
+      enabled: true
+      fixed_end_step_idx: 3
+      expected_world_size: 16
+      require_unique_samples: true
     adaln_cache:
       enabled: true
-      # Four persistent rollout tables plus at most two dynamic score tables.
       max_dynamic_keys: 2
     critic_rollout_reorder:
       enabled: true
-      # Must match fake_update_ratio to preserve five distinct optimizer steps.
       group_size: 5
   dmd:
     num_inference_steps: 4
@@ -91,13 +92,7 @@ training:
     lora:
       rank: 128
       alpha: 128
-      target_modules:
-        - to_q
-        - to_k
-        - to_v
-        - to_out.0
-        - ff.net.0.proj
-        - ff.net.2
+      target_modules: [to_q, to_k, to_v, to_out.0, ff.net.0.proj, ff.net.2]
     optimizer:
       learning_rate: 0.0001
       adam_beta1: 0.9
@@ -109,13 +104,7 @@ training:
     lora:
       rank: 128
       alpha: 128
-      target_modules:
-        - to_q
-        - to_k
-        - to_v
-        - to_out.0
-        - ff.net.0.proj
-        - ff.net.2
+      target_modules: [to_q, to_k, to_v, to_out.0, ff.net.0.proj, ff.net.2]
     optimizer:
       learning_rate: 0.00002
       adam_beta1: 0.9
@@ -125,7 +114,7 @@ training:
   teacher:
     guidance_scale: 1.0
     cfg_norm: none
-  output_dir: ${oc.env:H3_OUTPUT_DIR,./output_train/minimax_h3_a100_shared}
+  output_dir: ${oc.env:H3_OUTPUT_DIR,./output_train/minimax_h3_a100_hsdp}
 
 inference:
   method: none
@@ -133,7 +122,7 @@ inference:
 
 logging:
   rank_zero_only: true
-  train_log_every_iters: 10
+  train_log_every_iters: 1
 
 resume:
-  auto_resume: true
+  auto_resume: false
