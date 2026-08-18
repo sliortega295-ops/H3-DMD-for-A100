@@ -48,17 +48,29 @@ class _H3CheckpointSegment(torch.nn.Module):
     sequence remain upstream-defined.
     """
 
-    def __init__(self, blocks: list[torch.nn.Module], start: int):
+    def __init__(self, blocks: list[torch.nn.Module], start: int, controller):
         super().__init__()
         if not blocks:
             raise ValueError("An H3 activation-checkpoint segment cannot be empty")
         self.blocks = torch.nn.ModuleList(blocks)
         self.start = int(start)
+        object.__setattr__(self, "_adaln_controller", controller)
+        self._replay_scope = (None, False)
 
     def forward(self, hidden_states, temb, adaln_indices, rotary_emb):
-        for block in self.blocks:
-            hidden_states = block(hidden_states, temb, adaln_indices, rotary_emb)
-        return hidden_states
+        controller = self._adaln_controller
+        active = controller.current_scope()
+        if active.key is not None:
+            # The original checkpoint forward has the exact request scope.
+            # Save it on this segment so replay can restore it even though
+            # contextvars are not propagated by non-reentrant checkpointing.
+            self._replay_scope = (active.key, active.persistent)
+        key, persistent = self._replay_scope
+        scope = controller.scope(key, persistent=persistent) if key is not None else contextlib.nullcontext()
+        with scope:
+            for block in self.blocks:
+                hidden_states = block(hidden_states, temb, adaln_indices, rotary_emb)
+            return hidden_states
 
 
 def _configure_local_flash_attn3() -> None:
@@ -242,7 +254,7 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         if any(isinstance(block, _H3CheckpointSegment) for block in blocks):
             raise RuntimeError("Activation checkpoint segmentation was configured more than once")
         segments = [
-            _H3CheckpointSegment(blocks[start : start + segment_size], start)
+            _H3CheckpointSegment(blocks[start : start + segment_size], start, self.adaln_cache())
             for start in range(0, len(blocks), segment_size)
         ]
         transformer.transformer_blocks = torch.nn.ModuleList(segments)

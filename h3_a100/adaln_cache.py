@@ -76,6 +76,17 @@ class AdaLNCacheController:
         finally:
             self._scope.reset(token)
 
+    def current_scope(self) -> _Scope:
+        """Return the active scope for checkpoint wrappers.
+
+        PyTorch's non-reentrant checkpoint replay preserves RNG/autocast state,
+        but not arbitrary ``contextvars``.  A segmented checkpoint wrapper uses
+        this read-only snapshot to restore the exact AdaLN cache key during
+        replay; it does not alter cache contents or training math.
+        """
+
+        return self._scope.get()
+
     def get_or_compute(
         self,
         block_index: int,
