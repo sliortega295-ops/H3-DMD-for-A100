@@ -67,6 +67,30 @@ def _configure_local_flash_attn3() -> None:
     logger.info("[h3-a100] bound local FlashAttention-3 kernel: {}", local_path)
 
 
+def _ensure_fsdp_root_initialized(module: torch.nn.Module) -> None:
+    """Initialize the FSDP2 root before touching a sharded child directly.
+
+    AdaLN precomputation intentionally calls the sharded ``time_embedder``
+    before the first full transformer forward.  FSDP2 normally discovers the
+    root from that first forward; entering the child first makes the child look
+    like a root and the subsequent real forward fails.  Calling the same
+    private lazy-init routine on the already-sharded root is metadata/stream
+    setup only: it does not run a collective or move a tensor, and preserves
+    the normal first-forward ownership semantics.
+    """
+
+    try:
+        from torch.distributed.fsdp._fully_shard._fsdp_state import (
+            _get_module_fsdp_state,
+        )
+    except ImportError:
+        return
+    state = _get_module_fsdp_state(module)
+    if state is None or state._is_root is not None:
+        return
+    state._lazy_init()
+
+
 def _lora_config(mapping: Mapping[str, Any]) -> LoraConfig:
     rank = int(mapping["rank"])
     alpha = int(mapping.get("alpha", rank))
@@ -250,6 +274,7 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         """Materialize all block modulations for one exact timestep table."""
 
         transformer = self.denoiser_module()
+        _ensure_fsdp_root_initialized(transformer)
         bank = adaln_bank(transformer)
         controller = self.adaln_cache()
         if bank is None:
