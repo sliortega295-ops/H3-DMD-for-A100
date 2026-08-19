@@ -21,7 +21,9 @@ export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
 export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
 export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-2}
 export H3_ATTN_BACKEND=${H3_ATTN_BACKEND:-_flash_3_hub}
-export H3_BENCHMARK_SEED=${H3_BENCHMARK_SEED:-42}
+# Match the DMD-System MiniMax matched benchmark unless the caller explicitly
+# chooses a different diagnostic seed.
+export H3_BENCHMARK_SEED=${H3_BENCHMARK_SEED:-20260817}
 
 if [[ ${H3_SKIP_PREFLIGHT:-0} != 1 ]]; then
   python "${REPO_ROOT}/scripts/preflight.py" --lightx2v-root "${LIGHTX2V_ROOT}"
