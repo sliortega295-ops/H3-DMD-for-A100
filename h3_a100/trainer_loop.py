@@ -54,12 +54,14 @@ class H3A100LoopMixin:
         while current_iter < self.max_train_iters:
             if self.matched_compute_enabled:
                 self.matched_cycle_census.reset()
+            self._begin_boundary_offload_cycle()
             with self._nvtx("h3/student_step"):
                 running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
             with self._nvtx("h3/critic_phase"):
                 running_fake = self._fake_steps(samples, grad_accum_iters)
             if self.matched_compute_enabled:
                 self._validate_matched_cycle(current_iter)
+            self._validate_boundary_offload_cycle(current_iter)
 
             current_iter += 1
             display_dmd = reduce_mean(running_dmd)
@@ -102,8 +104,9 @@ class H3A100LoopMixin:
             with self._activation_offload_scope("student") as offload:
                 result = self.forward_student_loss(latent_shape, conditions, current_iter=current_iter)
                 if offload is not None:
-                    # Keep original-forward handles available for backward,
-                    # but do not offload checkpoint-replay intermediates.
+                    # Legacy thresholded offload is diagnostic only.  The
+                    # production checkpoint-boundary policy is installed at
+                    # the transformer's native checkpoint function instead.
                     offload.begin_backward()
                 self.shared_model.transformer.train()
                 with self.shared_model.role_scope(STUDENT_ADAPTER), self.shared_model.adaln_scope(
@@ -191,6 +194,58 @@ class H3A100LoopMixin:
         self.fake_lr_scheduler.step()
         self.fake_optimizer.zero_grad(set_to_none=True)
         return fake_loss_value
+
+    def _begin_boundary_offload_cycle(self) -> None:
+        registration = getattr(self, "boundary_offload_registration", None)
+        if registration is None:
+            self._boundary_offload_cycle_start = None
+            return
+        self._boundary_offload_cycle_start = dict(registration.stats)
+
+    def _validate_boundary_offload_cycle(self, current_iter: int) -> None:
+        registration = getattr(self, "boundary_offload_registration", None)
+        if registration is None:
+            return
+        start = self._boundary_offload_cycle_start
+        if start is None:
+            raise RuntimeError("checkpoint-boundary offload cycle baseline is missing")
+        stats = registration.stats
+
+        def delta(key: str) -> int:
+            return int(stats[key]) - int(start.get(key, 0))
+
+        # Matched H3 has one Student grad DiT and five Fake grad DiTs.  Native
+        # per-block checkpointing therefore produces 6 * 50 checkpoint-input
+        # saves.  Recompute itself is outside the save hook.
+        expected = {
+            "grad_transformer_forward_count": 6,
+            "student_grad_forward_count": 1,
+            "fake_grad_forward_count": 5,
+            "other_grad_forward_count": 0,
+            "grad_checkpoint_call_count": 300,
+            "cpu_copy_count": 300,
+        }
+        observed = {key: delta(key) for key in expected}
+        errors = [
+            f"{key}={observed[key]} expected={value}"
+            for key, value in expected.items()
+            if observed[key] != value
+        ]
+        if errors:
+            raise RuntimeError(
+                "checkpoint-boundary CPU staging contract failed at outer iteration "
+                f"{current_iter}: {'; '.join(errors)}"
+            )
+        offloaded = delta("offloaded_storage_bytes")
+        logger.info(
+            "[h3-a100][boundary-offload] iter={} rank={} policy={} observed={} "
+            "offloaded_gib={:.2f}",
+            current_iter,
+            get_rank(),
+            registration.receipt()["policy"],
+            observed,
+            offloaded / 1024**3,
+        )
 
     def _validate_matched_cycle(self, current_iter: int) -> None:
         local_errors = self.matched_cycle_census.validate_local()
