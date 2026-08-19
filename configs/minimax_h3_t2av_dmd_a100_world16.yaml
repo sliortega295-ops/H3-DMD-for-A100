@@ -2,6 +2,10 @@
 # contract and change only the intended H3 systems mechanisms: one shared
 # backbone, named Student/Fake LoRAs, exact AdaLN caching, and phase-clustered
 # 5x Student no-grad rollouts before five ordered Fake updates.
+#
+# Capacity policy intentionally mirrors the DMD-System path that already passed
+# on the same 16xA100 hardware: native per-block activation checkpointing plus
+# pinned-CPU staging of every checkpoint input boundary.
 model:
   name: minimax_h3_t2av_a100
   pretrained_model_name_or_path: ${oc.env:MINIMAX_H3_MODEL_PATH,/models/MiniMax-H3}
@@ -53,7 +57,7 @@ scheduler:
 
 training:
   method: minimax_h3_t2av_dmd_a100
-  seed: ${oc.decode:${oc.env:H3_BENCHMARK_SEED,42}}
+  seed: ${oc.decode:${oc.env:H3_BENCHMARK_SEED,20260817}}
   max_train_iters: ${oc.decode:${oc.env:H3_MAX_ITERS,5}}
   gradient_accumulation_iters: 1
   gradient_checkpointing: true
@@ -74,6 +78,16 @@ training:
       fixed_end_step_idx: 3
       expected_world_size: 16
       require_unique_samples: true
+    activation_checkpointing:
+      # 1 == pinned upstream native per-block checkpointing.  Do not use the
+      # previous segment=8 capacity experiment for the primary path.
+      segment_size: 1
+    activation_policy:
+      name: checkpoint_boundary_cpu
+      pin_memory: true
+      # Per-boundary JSONL is diagnostic and intentionally disabled during
+      # formal timing.  Aggregate counters remain fail-closed in the trainer.
+      detailed_events: false
     adaln_cache:
       enabled: true
       max_dynamic_keys: 2
