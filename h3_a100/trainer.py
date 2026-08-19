@@ -223,6 +223,7 @@ class MiniMaxH3A100DmdTrainer(
             self._load_rank_state_after_fsdp(resume_ckpt_path)
 
         self._log_cuda_memory("after_setup")
+        self._install_residency_block_hooks()
         logger.info(
             "[h3-a100] setup physical_backbones=1 logical_roles=3 "
             "student_params={} fake_params={} fsdp={} critic_reorder={} matched_compute={}",
@@ -241,6 +242,29 @@ class MiniMaxH3A100DmdTrainer(
             self.boundary_offload_events,
             self.activation_offload_enabled,
         )
+
+    def _install_residency_block_hooks(self) -> None:
+        """Install opt-in block markers for a bounded OOM attribution run."""
+        if os.environ.get("H3_MEMORY_ATTRIBUTION_BLOCKS", "0").lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return
+        handles = []
+        blocks = list(getattr(self.shared_model.denoiser_module(), "transformer_blocks", ()))
+        for index, block in enumerate(blocks):
+            def pre_hook(_module, _inputs, block_index=index):
+                self._log_residency(f"block_{block_index}_pre")
+
+            def post_hook(_module, _inputs, _output, block_index=index):
+                self._log_residency(f"block_{block_index}_post")
+
+            handles.append(block.register_forward_pre_hook(pre_hook))
+            handles.append(block.register_forward_hook(post_hook, always_call=True))
+        self._residency_block_hooks = handles
+        logger.info("[h3-a100][residency] installed block hooks count={}", len(blocks))
 
     def _activation_offload_scope(self, logical_component: str):
         return maybe_saved_tensor_offload(
