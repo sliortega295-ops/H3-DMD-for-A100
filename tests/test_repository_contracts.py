@@ -19,19 +19,38 @@ def test_primary_config_is_world16_matched_control():
     assert config["distributed"]["fsdp2"]["size"] == 16
     assert config["training"]["a100"]["matched_compute"]["fixed_end_step_idx"] == 3
     assert config["training"]["a100"]["matched_compute"]["expected_world_size"] == 16
+    assert config["training"]["a100"]["activation_checkpointing"]["segment_size"] == 1
+    assert config["training"]["a100"]["activation_policy"] == {
+        "name": "checkpoint_boundary_cpu",
+        "pin_memory": True,
+        "detailed_events": False,
+    }
     assert config["training"]["a100"]["adaln_cache"]["enabled"] is True
     assert config["training"]["a100"]["critic_rollout_reorder"]["group_size"] == 5
     assert config["training"]["dmd"]["fake_update_ratio"] == 5
+    assert "20260817" in str(config["training"]["seed"])
 
 
-def test_hsdp_config_keeps_same_compute_contract():
+def test_hsdp_config_keeps_same_compute_and_activation_contract():
     config = yaml.safe_load(
         (ROOT / "configs/minimax_h3_t2av_dmd_a100_2x8.yaml").read_text(encoding="utf-8")
     )
     assert config["distributed"]["hybrid_shard"] == {"enabled": True, "shard_size": 8}
     assert config["training"]["a100"]["matched_compute"]["fixed_end_step_idx"] == 3
     assert config["training"]["a100"]["matched_compute"]["expected_world_size"] == 16
+    assert config["training"]["a100"]["activation_checkpointing"]["segment_size"] == 1
+    assert config["training"]["a100"]["activation_policy"]["name"] == "checkpoint_boundary_cpu"
     assert config["data"]["train"]["batch_size"] == 1
+
+
+def test_smoke_exercises_boundary_offload():
+    config = yaml.safe_load(
+        (ROOT / "configs/minimax_h3_t2av_dmd_a100_smoke.yaml").read_text(encoding="utf-8")
+    )
+    assert config["distributed"]["fsdp2"]["size"] == 8
+    assert config["training"]["a100"]["matched_compute"]["expected_world_size"] == 8
+    assert config["training"]["a100"]["activation_checkpointing"]["segment_size"] == 1
+    assert config["training"]["a100"]["activation_policy"]["name"] == "checkpoint_boundary_cpu"
 
 
 def test_upstream_commit_matches_dmd_system_reference():
