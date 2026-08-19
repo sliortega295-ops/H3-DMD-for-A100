@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import torch
 from loguru import logger
 
+from lightx2v_train.runtime.distributed import get_rank
 from lightx2v_train.runtime.parallel import apply_parallel
 from lightx2v_train.trainers.dmd.minimax_h3_trainer import MiniMaxH3T2AVDmdTrainer
 from lightx2v_train.utils.registry import TRAINER_REGISTER
 
-from .checkpointing import H3A100CheckpointMixin
 from .activation_offload import maybe_saved_tensor_offload
+from .checkpoint_boundary_offload import (
+    POLICY_NAME as CHECKPOINT_BOUNDARY_CPU,
+    install_checkpoint_boundary_cpu_offload,
+)
+from .checkpointing import H3A100CheckpointMixin
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -42,6 +48,9 @@ class MiniMaxH3A100DmdTrainer(
         cache = a100.get("adaln_cache", {})
         reorder = a100.get("critic_rollout_reorder", {})
         matched = a100.get("matched_compute", {})
+        checkpointing = a100.get("activation_checkpointing", {})
+        activation_policy = a100.get("activation_policy", {})
+
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
         self.reorder_critic_rollouts = bool(reorder.get("enabled", True))
@@ -62,7 +71,7 @@ class MiniMaxH3A100DmdTrainer(
             expected_world_size=self.matched_expected_world_size,
             require_unique_samples=self.matched_require_unique_samples,
         )
-        checkpointing = a100.get("activation_checkpointing", {})
+
         self.activation_checkpoint_segment_size = int(
             os.environ.get(
                 "H3_ACTIVATION_CHECKPOINT_SEGMENT",
@@ -74,9 +83,32 @@ class MiniMaxH3A100DmdTrainer(
                 "H3_ACTIVATION_CHECKPOINT_SEGMENT must be >= 1, got "
                 f"{self.activation_checkpoint_segment_size}"
             )
-        # This is a bounded capacity candidate, not part of the default
-        # controlled path.  It is enabled only by an explicit environment
-        # variable so the checkpoint-only baseline remains unchanged.
+
+        # Production world16 now mirrors the DMD-System capacity path that
+        # actually passed: native per-block checkpointing plus CPU staging of
+        # every checkpoint boundary input.  The old thresholded saved-tensor
+        # offload remains available only as an explicit diagnostic fallback.
+        self.activation_policy = str(
+            os.environ.get(
+                "H3_ACTIVATION_POLICY",
+                activation_policy.get("name", "none"),
+            )
+        )
+        if self.activation_policy not in {"none", CHECKPOINT_BOUNDARY_CPU}:
+            raise ValueError(
+                "H3_ACTIVATION_POLICY must be 'none' or "
+                f"'{CHECKPOINT_BOUNDARY_CPU}', got {self.activation_policy!r}"
+            )
+        self.boundary_offload_pin_memory = os.environ.get(
+            "H3_BOUNDARY_OFFLOAD_PIN_MEMORY",
+            str(int(bool(activation_policy.get("pin_memory", True)))),
+        ).lower() in {"1", "true", "yes", "on"}
+        self.boundary_offload_events = os.environ.get(
+            "H3_BOUNDARY_OFFLOAD_EVENTS",
+            str(int(bool(activation_policy.get("detailed_events", False)))),
+        ).lower() in {"1", "true", "yes", "on"}
+        self.boundary_offload_registration = None
+
         self.activation_offload_enabled = os.environ.get(
             "H3_ACTIVATION_OFFLOAD", "0"
         ).lower() in {"1", "true", "yes", "on"}
@@ -88,6 +120,20 @@ class MiniMaxH3A100DmdTrainer(
         ).lower() in {"1", "true", "yes", "on"}
         if self.activation_offload_min_bytes < 0:
             raise ValueError("H3_ACTIVATION_OFFLOAD_MIN_BYTES must be >= 0")
+        if self.activation_policy == CHECKPOINT_BOUNDARY_CPU:
+            if self.activation_checkpoint_segment_size != 1:
+                raise ValueError(
+                    "checkpoint_boundary_cpu requires native per-block checkpointing: "
+                    "H3_ACTIVATION_CHECKPOINT_SEGMENT must be 1"
+                )
+            if self.activation_offload_enabled:
+                raise ValueError(
+                    "checkpoint_boundary_cpu is mutually exclusive with the legacy "
+                    "H3_ACTIVATION_OFFLOAD threshold policy"
+                )
+            if not self.gradient_checkpointing:
+                raise ValueError("checkpoint_boundary_cpu requires gradient_checkpointing=true")
+
         self._validate_matched_static_contract()
         self._score_serial = 0
 
@@ -132,6 +178,24 @@ class MiniMaxH3A100DmdTrainer(
         if self.gradient_checkpointing:
             model.enable_gradient_checkpointing()
 
+        if self.activation_policy == CHECKPOINT_BOUNDARY_CPU:
+            event_path = None
+            if self.boundary_offload_events:
+                event_path = (
+                    Path(self.output_train_dir)
+                    / "checkpoint_boundary_offload"
+                    / f"rank_{get_rank():03d}.jsonl"
+                )
+            self.boundary_offload_registration = install_checkpoint_boundary_cpu_offload(
+                model.denoiser_module(),
+                # The shared backbone uses a ContextVar so this returns the
+                # logical role that owns the current grad-enabled transformer
+                # call without changing adapter or autograd behavior.
+                role_getter=lambda: model._role.get(),
+                event_path=event_path,
+                pin_memory=self.boundary_offload_pin_memory,
+            )
+
         self.trainable_params = model.role_parameters(STUDENT_ADAPTER)
         self.fake_trainable_params = model.role_parameters(FAKE_ADAPTER)
         self._validate_shared_parameter_contract()
@@ -169,14 +233,13 @@ class MiniMaxH3A100DmdTrainer(
             self.matched_compute_enabled,
         )
         logger.info(
-            "[h3-a100] activation_checkpoint_segment_size={}",
+            "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
+            "boundary_events={} legacy_threshold_offload={}",
+            self.activation_policy,
             self.activation_checkpoint_segment_size,
-        )
-        logger.info(
-            "[h3-a100] activation_offload enabled={} min_bytes={} pin_memory={}",
+            self.boundary_offload_pin_memory,
+            self.boundary_offload_events,
             self.activation_offload_enabled,
-            self.activation_offload_min_bytes,
-            self.activation_offload_pin_memory,
         )
 
     def _activation_offload_scope(self, logical_component: str):
@@ -187,6 +250,11 @@ class MiniMaxH3A100DmdTrainer(
             min_offload_bytes=self.activation_offload_min_bytes,
             pin_memory=self.activation_offload_pin_memory,
         )
+
+    def _boundary_offload_receipt(self):
+        if self.boundary_offload_registration is None:
+            return None
+        return self.boundary_offload_registration.receipt()
 
     def _validate_reorder_contract(self) -> None:
         if not self.reorder_critic_rollouts:
