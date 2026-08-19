@@ -101,8 +101,10 @@ class H3A100LoopMixin:
             conditions = self._encode_conditions(sample)
             latent_shape = self._latent_shape(sample)
             self._set_shared_gradient_sync(micro_idx == grad_accum_iters - 1)
+            self._log_residency("before_student_grad_forward")
             with self._activation_offload_scope("student") as offload:
                 result = self.forward_student_loss(latent_shape, conditions, current_iter=current_iter)
+                self._log_residency("after_student_grad_forward")
                 if offload is not None:
                     # Legacy thresholded offload is diagnostic only.  The
                     # production checkpoint-boundary policy is installed at
@@ -114,7 +116,9 @@ class H3A100LoopMixin:
                 ):
                     if self.matched_compute_enabled:
                         self.matched_cycle_census.note_backward(STUDENT_ROLE)
+                    self._log_residency("before_student_backward")
                     (result["loss"] / grad_accum_iters).backward()
+                    self._log_residency("after_student_backward")
             if offload is not None:
                 logger.info(
                     "[h3-a100][activation-offload] component=student stats={}",
@@ -124,8 +128,10 @@ class H3A100LoopMixin:
 
         sync_sequence_parallel_gradients(self.trainable_params)
         torch.nn.utils.clip_grad_norm_(self.trainable_params, self.max_grad_norm)
+        self._log_residency("before_student_optimizer")
         self.optimizer.step()
         self.lr_scheduler.step()
+        self._log_residency("after_student_optimizer")
         self.optimizer.zero_grad(set_to_none=True)
         return running_dmd
 
@@ -161,6 +167,7 @@ class H3A100LoopMixin:
             conditions = self._encode_conditions(sample)
             latent_shape = self._latent_shape(sample)
             group.append(self.prepare_fake_update(latent_shape, conditions))
+            self._log_residency(f"after_fake_{fake_index}_rollout_prepare")
         return group
 
     def _apply_one_fake_group(self, group: list[PreparedFakeUpdate]) -> float:
@@ -169,7 +176,9 @@ class H3A100LoopMixin:
         for micro_idx, item in enumerate(group):
             self._set_shared_gradient_sync(micro_idx == len(group) - 1)
             with self._activation_offload_scope(f"fake_{micro_idx}") as offload:
+                self._log_residency(f"before_fake_{micro_idx}_grad_forward")
                 loss_fake = self.fake_loss(item)
+                self._log_residency(f"after_fake_{micro_idx}_grad_forward")
                 if offload is not None:
                     offload.begin_backward()
                 self.shared_model.transformer.train()
@@ -178,7 +187,9 @@ class H3A100LoopMixin:
                 ):
                     if self.matched_compute_enabled:
                         self.matched_cycle_census.note_backward(FAKE_ROLE)
+                    self._log_residency(f"before_fake_{micro_idx}_backward")
                     (loss_fake / len(group)).backward()
+                    self._log_residency(f"after_fake_{micro_idx}_backward")
             if offload is not None:
                 logger.info(
                     "[h3-a100][activation-offload] component=fake_{} stats={}",
@@ -190,8 +201,10 @@ class H3A100LoopMixin:
 
         sync_sequence_parallel_gradients(self.fake_trainable_params)
         torch.nn.utils.clip_grad_norm_(self.fake_trainable_params, self.max_grad_norm)
+        self._log_residency("before_fake_optimizer")
         self.fake_optimizer.step()
         self.fake_lr_scheduler.step()
+        self._log_residency("after_fake_optimizer")
         self.fake_optimizer.zero_grad(set_to_none=True)
         return fake_loss_value
 
@@ -311,4 +324,82 @@ class H3A100LoopMixin:
             torch.cuda.memory_allocated() / 1024**3,
             torch.cuda.memory_reserved() / 1024**3,
             torch.cuda.max_memory_allocated() / 1024**3,
+        )
+
+    def _log_residency(self, stage: str) -> None:
+        """Emit bounded GPU residency attribution for OOM diagnosis only.
+
+        This is disabled by default and intentionally reads allocator/model
+        metadata without synchronizing or changing the training graph.  It is
+        not part of the timing contract.
+        """
+        if os.environ.get("H3_MEMORY_ATTRIBUTION", "0").lower() not in {"1", "true", "yes", "on"}:
+            return
+        if not torch.cuda.is_available():
+            return
+        stats = torch.cuda.memory_stats()
+        controller = None
+        try:
+            controller = self.shared_model.adaln_cache().stats()
+        except Exception:
+            pass
+
+        def tensor_bytes(value):
+            if not torch.is_tensor(value):
+                return 0
+            try:
+                return int(value.numel() * value.element_size())
+            except Exception:
+                return 0
+
+        def optimizer_bytes(optimizer):
+            total = 0
+            for state in optimizer.state.values():
+                for value in state.values():
+                    total += tensor_bytes(value)
+            return total
+
+        params = {"all": 0, "lora_student": 0, "lora_fake": 0, "frozen": 0}
+        try:
+            for name, parameter in self.shared_model.denoiser_module().named_parameters():
+                size = tensor_bytes(parameter)
+                params["all"] += size
+                if "lora_" in name and "student" in name:
+                    params["lora_student"] += size
+                elif "lora_" in name and "fake" in name:
+                    params["lora_fake"] += size
+                elif not parameter.requires_grad:
+                    params["frozen"] += size
+        except Exception:
+            pass
+
+        boundary = {}
+        registration = getattr(self, "boundary_offload_registration", None)
+        if registration is not None:
+            for key in (
+                "cpu_copy_count",
+                "offloaded_logical_bytes",
+                "offloaded_storage_bytes",
+                "pack_count",
+                "unpack_count",
+            ):
+                boundary[key] = int(registration.stats.get(key, 0))
+
+        free, total = torch.cuda.mem_get_info()
+        logger.info(
+            "[h3-a100][residency] stage={} allocated={} reserved={} active={} "
+            "inactive_split={} free={} total={} params={} opt_student={} opt_fake={} "
+            "adaln_cache={} boundary={}",
+            stage,
+            int(torch.cuda.memory_allocated()),
+            int(torch.cuda.memory_reserved()),
+            int(stats.get("active_bytes.all.current", 0)),
+            int(stats.get("inactive_split_bytes.all.current", 0)),
+            int(free),
+            int(total),
+            params,
+            optimizer_bytes(getattr(self, "optimizer", None)) if getattr(self, "optimizer", None) else 0,
+            optimizer_bytes(getattr(self, "fake_optimizer", None)) if getattr(self, "fake_optimizer", None) else 0,
+            0 if controller is None else int(controller.bytes),
+            boundary,
         )
