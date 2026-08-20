@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from functools import partial
+
 import pytest
 import torch
+from torch.utils.checkpoint import checkpoint
 
 from h3_a100.adaln_cache import AdaLNCacheController
 from h3_a100.exact_adaln_replay import install_exact_adaln_checkpoint_replay_scope
@@ -55,6 +58,45 @@ def test_exact_replay_restores_key_and_never_computes_projection():
         "cache_miss_count": 0,
         "unexpected_hit_delta_count": 0,
     }
+
+
+def test_exact_replay_handles_real_nonreentrant_early_stop():
+    class Transformer:
+        gradient_checkpointing = True
+
+        def __init__(self):
+            self._gradient_checkpointing_func = partial(checkpoint, use_reentrant=False)
+
+    transformer = Transformer()
+    controller = AdaLNCacheController(enabled=True, max_dynamic_keys=0)
+    key = ("rollout", 3)
+    controller._entries[key] = {0: (torch.tensor([0.25]),)}
+    controller._persistent.add(key)
+    registration = install_exact_adaln_checkpoint_replay_scope(
+        transformer, controller, expected_block_count=1
+    )
+
+    def projection_must_not_run(_):
+        raise AssertionError("projection fallback executed")
+
+    def block(x):
+        modulation = controller.get_or_compute(0, x, projection_must_not_run)[0]
+        # Multiple saved intermediates encourage the normal non-reentrant
+        # early-stop recompute path during backward.
+        y = (x + modulation).sin()
+        return y * y
+
+    x = torch.tensor([0.7], requires_grad=True)
+    with controller.scope(key, persistent=True):
+        y = transformer._gradient_checkpointing_func(block, x)
+    y.sum().backward()
+
+    assert x.grad is not None
+    assert registration.stats["checkpoint_wrap_count"] == 1
+    assert registration.stats["scoped_execution_count"] == 2
+    assert registration.stats["cache_hit_count"] == 2
+    assert registration.stats["cache_miss_count"] == 0
+    assert registration.stats["unexpected_hit_delta_count"] == 0
 
 
 def test_exact_replay_fails_closed_without_active_key():
