@@ -1,0 +1,43 @@
+run_id=iteration_316_grid1000_nsys_upgrade_preflight_20260820
+source_head=04b3a2eb0a1b3bbbc3d83575d4059d43804fcbd0
+source_branch=codex/grid1000-adaln-results-20260820
+workload=Grid1000 world16 one outer cycle Student1+Fake5
+formal_timing=false
+hostname=job-ae0cd37b-2a89-489c-9a15-09932329c44a-master-0
+which_nsys=/usr/local/cuda/bin/nsys
+nsys_realpath=/usr/local/cuda-12.2/NsightSystems-cli-2023.3.1/target-linux-x64/nsys
+nsys_version=NVIDIA Nsight Systems version 2023.3.1.92-233133147223v0
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+gpu_processes=
+oom=
+oom 0
+oom_kill 4
+
+hostname=job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+which_nsys=/usr/local/cuda/bin/nsys
+nsys_realpath=/usr/local/cuda-12.2/NsightSystems-cli-2023.3.1/target-linux-x64/nsys
+nsys_version=NVIDIA Nsight Systems version 2023.3.1.92-233133147223v0
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+NVIDIA A100-SXM4-40GB, 40960 MiB, 535.161.08
+gpu_processes=
+oom=
+oom 0
+oom_kill 0
+
+status=FAIL_NSYS_VERSION
+reason=both owned nodes expose Nsight Systems 2023.3.1.92, below required >=2024.6.2
+world16_profile=NOT_RUN
+sanity_test=NOT_RUN

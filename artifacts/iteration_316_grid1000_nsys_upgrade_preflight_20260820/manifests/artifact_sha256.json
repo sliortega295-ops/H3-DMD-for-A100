@@ -1,0 +1,25 @@
+{
+  "run_id": "iteration_316_grid1000_nsys_upgrade_preflight_20260820",
+  "files": [
+    {
+      "path": "logs/node0.txt",
+      "sha256": "5ddafe2fe3598d802824540dc2aaa7b3b10152fbc7c2862608b397a673ff9fad",
+      "bytes": 646
+    },
+    {
+      "path": "logs/node1.txt",
+      "sha256": "1bdba7dbdfe35c5643bc8d50f7548ffed95164293a875dc2d3d73e7866e3ef83",
+      "bytes": 646
+    },
+    {
+      "path": "manifests/preflight.txt",
+      "sha256": "871d66ddb3b351793f80fb55427bea1000f4ae078390bdd8bb01d930e5187776",
+      "bytes": 1692
+    },
+    {
+      "path": "reports/REPORT.md",
+      "sha256": "7ab5f1aefd8558ebae335b033d4d9c2a52eedc3e95d2aaab53d6595879031944",
+      "bytes": 1527
+    }
+  ]
+}

@@ -7,19 +7,24 @@
       "bytes": 1135
     },
     {
+      "path": "analysis/__pycache__/analyze_nsys_no_offload.cpython-312.pyc",
+      "sha256": "e48afc1a54e69f4480bda7a58d6a24612173160a1e90ef784961c3f31a23b147",
+      "bytes": 16964
+    },
+    {
       "path": "analysis/analyze_nsys_no_offload.py",
-      "sha256": "dbffb2448e445cdaf737f51253a24a725d12d09dbdd58efd2ffd9dd2388327e0",
-      "bytes": 7370
+      "sha256": "eca2261c4360ee14f4655f0cf9ebe40a7e5e199c35ef2dd56b788f6bff4b55b1",
+      "bytes": 11621
     },
     {
       "path": "analysis/nsys_no_offload_summary.csv",
-      "sha256": "7d6102215c34a9573c87a3bfdff0a8d0fe35c90eab24ae49dea70aef66bb588a",
-      "bytes": 1407
+      "sha256": "417c1a2b06b3b54586579bdbe61048880b3e488916bca652c0ed29e37650a178",
+      "bytes": 10619
     },
     {
       "path": "analysis/nsys_no_offload_summary.json",
-      "sha256": "bff4a69808f4c3a00e23619c42a75e426de881440db2fab64dc335e4f9457379",
-      "bytes": 4299
+      "sha256": "d1dcddf7ec37a2c9a8890482bf25860ba7f9bb8691f0d74be6bdb6adc323f129",
+      "bytes": 16286
     },
     {
       "path": "logs/node0_train.log",

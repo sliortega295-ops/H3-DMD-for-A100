@@ -2,138 +2,502 @@
   "run_id": "iteration_315_grid1000_no_boundary_offload_nsys_20260820",
   "profile_kind": "diagnostic_only",
   "formal_timing_used": false,
+  "phase_storage": "repeated NVTX ranges preserved as lists",
+  "metrics_scope": "node/device/phase; no cross-device union used for utilization",
   "nodes": {
     "node0": {
-      "sqlite": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node0/grid1000_no_offload_node0.sqlite",
+      "sqlite": "/home/lyy/Helios/H3-DMD-for-A100/worktrees/grid1000-adaln/artifacts/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node0/grid1000_no_offload_node0.sqlite",
       "sqlite_sha256": "f80f55a27ab4c699e92a4dfeb2f2ca8458e4c79eaff8f7119cef6862f01405b1",
-      "nvtx_ranges": [
-        [
-          379380699110,
-          1053983594072,
-          "h3/student_step",
-          674.602894962
+      "phase_ranges": {
+        "h3/student_step": [
+          [
+            379380699110,
+            1053983594072
+          ]
         ],
-        [
-          1053983646512,
-          1283260755088,
-          "h3/critic_update_F",
-          229.277108576
+        "h3/critic_update_F": [
+          [
+            1053983646512,
+            1283260755088
+          ]
         ]
+      },
+      "macro_phase_ranges": [
+        {
+          "name": "h3/student_step",
+          "occurrence": 0,
+          "start_ns": 379380699110,
+          "end_ns": 1053983594072
+        },
+        {
+          "name": "h3/critic_update_F",
+          "occurrence": 0,
+          "start_ns": 1053983646512,
+          "end_ns": 1283260755088
+        }
       ],
-      "workload_window_ns": [
-        379380699110,
-        1283260755088
-      ],
-      "workload_window_s": 903.880055978,
-      "phase_complete": true,
-      "capture_processing_errors": [
-        "nsys_report_processing_error"
-      ],
-      "kernel_events_total": 3853,
-      "kernel_events_in_nvtx": 3853,
-      "kernel_devices_in_nvtx": [
+      "phase_results": {
+        "h3/student_step#0": {
+          "name": "h3/student_step",
+          "occurrence": 0,
+          "start_ns": 379380699110,
+          "end_ns": 1053983594072,
+          "per_device": {
+            "0": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58584,
+              "h2d_events": 3,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "1": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 78120,
+              "h2d_events": 6,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "2": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 857,
+              "kernel_union_s": 4.530329536,
+              "known_compute_union_s": 4.530329536,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 228392,
+              "h2d_events": 12,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "3": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 19528,
+              "h2d_events": 1,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "5": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 97644,
+              "h2d_events": 6,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "6": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 19451244,
+              "h2d_events": 7,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "7": {
+              "phase_wall_s": 674.602894962,
+              "kernel_events": 2036,
+              "kernel_union_s": 11.428155347,
+              "known_compute_union_s": 11.426073479,
+              "nccl_union_s": 0.002081868,
+              "nccl_exposed_vs_known_compute_s": 0.002081868,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 491816,
+              "h2d_events": 26,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            }
+          },
+          "device_distributions": {
+            "kernel_union_s": {
+              "count": 7,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 2.2797835547142857,
+              "max": 11.428155347
+            },
+            "known_compute_union_s": {
+              "count": 7,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 2.279486145,
+              "max": 11.426073479
+            },
+            "nccl_union_s": {
+              "count": 7,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0002974097142857143,
+              "max": 0.002081868
+            },
+            "nccl_exposed_vs_known_compute_s": {
+              "count": 7,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0002974097142857143,
+              "max": 0.002081868
+            },
+            "h2d_bytes": {
+              "count": 7,
+              "min": 19528,
+              "median": 97644,
+              "mean": 2917904.0,
+              "max": 19451244
+            },
+            "d2h_bytes": {
+              "count": 7,
+              "min": 0,
+              "median": 0,
+              "mean": 0.0,
+              "max": 0
+            }
+          }
+        },
+        "h3/critic_update_F#0": {
+          "name": "h3/critic_update_F",
+          "occurrence": 0,
+          "start_ns": 1053983646512,
+          "end_ns": 1283260755088,
+          "per_device": {
+            "2": {
+              "phase_wall_s": 229.277108576,
+              "kernel_events": 270,
+              "kernel_union_s": 1.906022055,
+              "known_compute_union_s": 1.906022055,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 118864,
+              "h2d_events": 7,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "3": {
+              "phase_wall_s": 229.277108576,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 19528,
+              "h2d_events": 1,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "7": {
+              "phase_wall_s": 229.277108576,
+              "kernel_events": 690,
+              "kernel_union_s": 3.637213576,
+              "known_compute_union_s": 3.637213576,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58584,
+              "h2d_events": 3,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            }
+          },
+          "device_distributions": {
+            "kernel_union_s": {
+              "count": 3,
+              "min": 0.0,
+              "median": 1.906022055,
+              "mean": 1.8477452103333334,
+              "max": 3.637213576
+            },
+            "known_compute_union_s": {
+              "count": 3,
+              "min": 0.0,
+              "median": 1.906022055,
+              "mean": 1.8477452103333334,
+              "max": 3.637213576
+            },
+            "nccl_union_s": {
+              "count": 3,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0,
+              "max": 0.0
+            },
+            "nccl_exposed_vs_known_compute_s": {
+              "count": 3,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0,
+              "max": 0.0
+            },
+            "h2d_bytes": {
+              "count": 3,
+              "min": 19528,
+              "median": 58584,
+              "mean": 65658.66666666667,
+              "max": 118864
+            },
+            "d2h_bytes": {
+              "count": 3,
+              "min": 0,
+              "median": 0,
+              "mean": 0.0,
+              "max": 0
+            }
+          }
+        }
+      },
+      "kernel_events_in_workload": 3853,
+      "kernel_devices_in_workload": [
         2,
         7
       ],
       "kernel_device_coverage": 0.25,
-      "kernel_union_s_observed": 21.403604538,
-      "known_compute_union_s": 0.000527586,
-      "known_nccl_union_s": 0.002081868,
-      "known_nccl_exposed_vs_known_compute_s": 0.002081868,
-      "unresolved_kernel_union_s": 21.400995084,
-      "kernel_sum_duration_s": 21.763343682,
-      "kernel_coverage_vs_window_observed": 0.02367969554858831,
-      "h2d_events_nvtx": 72,
-      "h2d_bytes_nvtx": 20622304,
-      "h2d_union_s_nvtx": 0.001306254,
-      "d2h_events_nvtx": 0,
-      "d2h_bytes_nvtx": 0,
-      "d2h_union_s_nvtx": 0.0,
-      "h2d_events_full": 169,
-      "h2d_bytes_full": 2657115104,
-      "d2h_events_full": 0,
-      "d2h_bytes_full": 0,
-      "copy_kind8_events_nvtx": 1,
-      "copy_kind8_bytes_nvtx": 1248,
-      "phases": {
-        "h3/student_step": {
-          "wall_s": 674.602894962,
-          "kernel_union_s": 15.860368907,
-          "known_nccl_union_s": 0.002081868,
-          "d2h_bytes": 0,
-          "d2h_events": 0
-        },
-        "h3/critic_update_F": {
-          "wall_s": 229.277108576,
-          "kernel_union_s": 5.543235631,
-          "known_nccl_union_s": 0.0,
-          "d2h_bytes": 0,
-          "d2h_events": 0
-        }
-      }
+      "unresolved_kernel_events": 0,
+      "unresolved_kernel_duration_s": 0.0,
+      "h2d_bytes_in_workload": 20622304,
+      "d2h_bytes_in_workload": 0,
+      "d2h_events_in_workload": 0,
+      "capture_processing_errors": []
     },
     "node1": {
-      "sqlite": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node1/grid1000_no_offload_node1.sqlite",
+      "sqlite": "/home/lyy/Helios/H3-DMD-for-A100/worktrees/grid1000-adaln/artifacts/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node1/grid1000_no_offload_node1.sqlite",
       "sqlite_sha256": "e53f16e778f8981421e0f1cb7d90e9a6dca57c4d373eeb679c2e9f7e657350c2",
-      "nvtx_ranges": [
-        [
-          369931370760,
-          1273661511529,
-          "h3/student_step",
-          903.730140769
+      "phase_ranges": {
+        "h3/student_step": [
+          [
+            369931370760,
+            1273661511529
+          ]
         ]
+      },
+      "macro_phase_ranges": [
+        {
+          "name": "h3/student_step",
+          "occurrence": 0,
+          "start_ns": 369931370760,
+          "end_ns": 1273661511529
+        }
       ],
-      "workload_window_ns": [
-        369931370760,
-        1273661511529
-      ],
-      "workload_window_s": 903.730140769,
-      "phase_complete": false,
-      "capture_processing_errors": [
-        "nsys_report_processing_error"
-      ],
-      "kernel_events_total": 20,
-      "kernel_events_in_nvtx": 20,
-      "kernel_devices_in_nvtx": [
+      "phase_results": {
+        "h3/student_step#0": {
+          "name": "h3/student_step",
+          "occurrence": 0,
+          "start_ns": 369931370760,
+          "end_ns": 1273661511529,
+          "per_device": {
+            "0": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58584,
+              "h2d_events": 3,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "1": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 78112,
+              "h2d_events": 4,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "2": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58588,
+              "h2d_events": 4,
+              "d2h_bytes": 4,
+              "d2h_events": 1
+            },
+            "3": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 78112,
+              "h2d_events": 4,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "4": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 20,
+              "kernel_union_s": 0.55096832,
+              "known_compute_union_s": 0.55096832,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 4,
+              "h2d_events": 1,
+              "d2h_bytes": 4,
+              "d2h_events": 1
+            },
+            "5": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58588,
+              "h2d_events": 4,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "6": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 111224,
+              "h2d_events": 6,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            },
+            "7": {
+              "phase_wall_s": 903.730140769,
+              "kernel_events": 0,
+              "kernel_union_s": 0.0,
+              "known_compute_union_s": 0.0,
+              "nccl_union_s": 0.0,
+              "nccl_exposed_vs_known_compute_s": 0.0,
+              "unresolved_kernel_events": 0,
+              "unresolved_kernel_union_s": 0.0,
+              "h2d_bytes": 58588,
+              "h2d_events": 4,
+              "d2h_bytes": 0,
+              "d2h_events": 0
+            }
+          },
+          "device_distributions": {
+            "kernel_union_s": {
+              "count": 8,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.06887104,
+              "max": 0.55096832
+            },
+            "known_compute_union_s": {
+              "count": 8,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.06887104,
+              "max": 0.55096832
+            },
+            "nccl_union_s": {
+              "count": 8,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0,
+              "max": 0.0
+            },
+            "nccl_exposed_vs_known_compute_s": {
+              "count": 8,
+              "min": 0.0,
+              "median": 0.0,
+              "mean": 0.0,
+              "max": 0.0
+            },
+            "h2d_bytes": {
+              "count": 8,
+              "min": 4,
+              "median": 58588,
+              "mean": 62725.0,
+              "max": 111224
+            },
+            "d2h_bytes": {
+              "count": 8,
+              "min": 0,
+              "median": 0,
+              "mean": 1.0,
+              "max": 4
+            }
+          }
+        }
+      },
+      "kernel_events_in_workload": 20,
+      "kernel_devices_in_workload": [
         4
       ],
       "kernel_device_coverage": 0.125,
-      "kernel_union_s_observed": 0.55096832,
-      "known_compute_union_s": 0.0,
-      "known_nccl_union_s": 0.0,
-      "known_nccl_exposed_vs_known_compute_s": 0.0,
-      "unresolved_kernel_union_s": 0.55096832,
-      "kernel_sum_duration_s": 0.55096832,
-      "kernel_coverage_vs_window_observed": 0.0006096602239371715,
-      "h2d_events_nvtx": 30,
-      "h2d_bytes_nvtx": 501800,
-      "h2d_union_s_nvtx": 0.000124353,
-      "d2h_events_nvtx": 2,
-      "d2h_bytes_nvtx": 8,
-      "d2h_union_s_nvtx": 6.368e-06,
-      "h2d_events_full": 108,
-      "h2d_bytes_full": 2310820904,
-      "d2h_events_full": 2,
-      "d2h_bytes_full": 8,
-      "copy_kind8_events_nvtx": 0,
-      "copy_kind8_bytes_nvtx": 0,
-      "phases": {
-        "h3/student_step": {
-          "wall_s": 903.730140769,
-          "kernel_union_s": 0.55096832,
-          "known_nccl_union_s": 0.0,
-          "d2h_bytes": 8,
-          "d2h_events": 2
-        }
-      }
+      "unresolved_kernel_events": 0,
+      "unresolved_kernel_duration_s": 0.0,
+      "h2d_bytes_in_workload": 501800,
+      "d2h_bytes_in_workload": 8,
+      "d2h_events_in_workload": 2,
+      "capture_processing_errors": []
     }
   },
   "world16_usable": false,
   "validity_reasons": [
+    "node0:missing_student_or_critic_phase",
     "node0:kernel_devices=[2, 7]",
-    "node0:processing_error",
-    "node1:missing_phase",
-    "node1:kernel_devices=[4]",
-    "node1:processing_error"
+    "node1:missing_student_or_critic_phase",
+    "node1:kernel_devices=[4]"
   ]
 }
