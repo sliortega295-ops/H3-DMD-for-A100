@@ -11,6 +11,9 @@ from loguru import logger
 
 from . import model as _model  # noqa: F401
 from . import trainer as _trainer  # noqa: F401
+# Branch-specific fail-closed replay wrapper. Import after trainer registration
+# so it can patch only the experimental H3 A100 trainer class.
+from . import exact_adaln_replay as _exact_adaln_replay  # noqa: F401
 from .distributed import init_distributed_a100
 
 from lightx2v_train.data import build_data, prepare_data
