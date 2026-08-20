@@ -1,0 +1,6 @@
+variant,run_id,start_utc,end_utc,one_cycle_wall_s,peak_allocated_gib,peak_reserved_gib,formal_timing_eligible
+Grid1000,iteration_310_grid1000_world16_20260820,2026-08-20T06:33:15.010Z,2026-08-20T06:48:20.903Z,905.893,17.56,20.12,false
+Grid1000,iteration_311_grid1000_lowoverhead_20260820,2026-08-20T06:58:50.253Z,2026-08-20T07:14:02.018Z,911.765,17.56,20.12,false
+ExactReplayReference,iteration_309_exact_adaln_replay_timing_20260820,2026-08-20T04:25:16.183Z,2026-08-20T04:40:28.901Z,912.718721,19.01,21.14,false
+DMDSystemNative,reference,NA,NA,917.993973,27.94,38.23,false
+DMDSystemPhaseCluster,reference,NA,NA,914.102536,28.10,38.23,false

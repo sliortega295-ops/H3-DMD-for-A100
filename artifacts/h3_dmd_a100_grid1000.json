@@ -1,0 +1,66 @@
+{
+  "status": "CAPACITY_PASS_CONTRACT_PASS",
+  "semantics": "approximate_grid1000_sigma",
+  "source_head": "cf141e6edb2bc1bfdf0f09d5e4c88842a5cc049f",
+  "lightx2v_head": "d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be",
+  "topology": "world16_fsdp2_2x8",
+  "workload": "one outer DMD cycle = Student1 + Fake5",
+  "shape": "768x1344x124",
+  "dtype": "bf16",
+  "attention_backend": "_flash_3_hub",
+  "batch_per_rank": 1,
+  "fixed_end_step_idx": 3,
+  "activation_checkpoint_segment": 1,
+  "activation_policy": "checkpoint_boundary_cpu",
+  "grid_size": 1000,
+  "grid_table_binary_bytes": 19431014400,
+  "grid_table_manifest_sha256": "dd2625e0013509e31b984ee37be752c5d397da7e23aa1c945f66150af95cc1f3",
+  "grid_table_builder_sha256": "1901386c9ecfb7f88eac217f2875ce55f804e7bbeb123e05440db303f5227481",
+  "dropped_adaln_parameter_numel": 13010457600,
+  "registered_adaln_parameter_numel": 0,
+  "table_validation": {"status": "PASS", "checked": 48, "failures": 0},
+  "runtime_contract": {
+    "forward": {"student": 24, "fake": 6, "teacher": 1},
+    "grad_forward": {"student": 1, "fake": 5, "teacher": 0},
+    "backward": {"student": 1, "fake": 5},
+    "checkpoint_wrap_count": 300,
+    "scoped_execution_count": 600,
+    "cache_hit_count": 600,
+    "cache_miss_count": 0,
+    "missing_key_count": 0,
+    "boundary_cpu_copy_count": 300,
+    "world_size": 16
+  },
+  "runs": {
+    "diagnostic_memory_attribution": {
+      "run_id": "iteration_310_grid1000_world16_20260820",
+      "start_utc": "2026-08-20T06:33:15.010Z",
+      "end_utc": "2026-08-20T06:48:20.903Z",
+      "one_cycle_wall_seconds": 905.893,
+      "peak_allocated_gib": 17.56,
+      "peak_reserved_gib": 20.12,
+      "formal_timing_eligible": false
+    },
+    "low_overhead": {
+      "run_id": "iteration_311_grid1000_lowoverhead_20260820",
+      "start_utc": "2026-08-20T06:58:50.253Z",
+      "end_utc": "2026-08-20T07:14:02.018Z",
+      "one_cycle_wall_seconds": 911.765,
+      "peak_allocated_gib": 17.56,
+      "peak_reserved_gib": 20.12,
+      "formal_timing_eligible": false,
+      "reason": "single run; Grid changes sigma semantics"
+    }
+  },
+  "comparisons": {
+    "exact_replay_one_cycle_seconds": 912.718721,
+    "raw_grid_minus_exact_seconds": -0.953721,
+    "raw_relative_change": -0.0010448,
+    "dmd_system_native_seconds": 917.993973,
+    "dmd_system_native_peak_allocated_gib": 27.94,
+    "dmd_system_phase_cluster_seconds": 914.102536,
+    "dmd_system_phase_cluster_peak_allocated_gib": 28.10
+  },
+  "oom": {"node0_oom_delta": 0, "node1_oom_delta": 0, "node0_oom_kill_delta": 0, "node1_oom_kill_delta": 0},
+  "not_run": ["three_run_formal_timing", "continuous_vs_grid_numerical_quality_study", "full5_as_five_outer_cycles"]
+}

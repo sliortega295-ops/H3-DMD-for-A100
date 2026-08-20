@@ -124,17 +124,11 @@ def main() -> int:
     if len({tuple(row) for row in timestep_bits}) != num_entries:
         raise RuntimeError("rollout/grid timestep pairs unexpectedly collide")
 
-    # Precompute the shared timestep embedding for all 2*1004 AV timesteps.
+    # Keep the timestep pair on CPU.  The runtime cache computes the timestep
+    # projection/MLP for one request at a time; doing one giant MLP here would
+    # select a different BF16 reduction tree and defeat the bitwise table gate.
     transformer.time_proj.to(device)
     transformer.time_embedder.to(device)
-    with torch.no_grad():
-        flat_timesteps = timestep_pairs.reshape(-1).to(device)
-        temb = transformer.time_proj(flat_timesteps)
-        temb = transformer.time_embedder(
-            temb.to(get_parameter_dtype(transformer.time_embedder))
-        )
-    if temb.shape[0] != num_entries * 2:
-        raise RuntimeError(f"unexpected timestep embedding shape {tuple(temb.shape)}")
 
     shape = (num_entries, 50, 6, 6, hidden_size)
     numel = 1
@@ -153,25 +147,36 @@ def main() -> int:
     with torch.no_grad():
         for block_index, block in enumerate(blocks):
             projection = block.adaln_proj.to(device)
-            chunks = projection(temb)
-            if len(chunks) != 6:
-                raise RuntimeError(f"block {block_index} returned {len(chunks)} AdaLN chunks")
-            # projection(all 2-entry timesteps) returns six tensors of
-            # [num_entries*6, hidden].  Regroup into
-            # [entry, modulation_chunk, 2_timesteps*3_modalities, hidden].
-            modulation = torch.stack(
-                [chunk.reshape(num_entries, 6, hidden_size) for chunk in chunks],
-                dim=1,
-            ).to(dtype=torch.bfloat16)
-            table[:, block_index].copy_(modulation.to(device="cpu"))
+            # The training-side cache computes one two-timestep AV pair at a
+            # time.  A single large GEMM over all 1004 entries can select a
+            # different cuBLAS reduction tree and therefore produce BF16
+            # values that are numerically close but not bitwise identical to
+            # the per-request projection.  Build each entry with the exact
+            # runtime batch shape so the table validator is a real bitwise
+            # check rather than a check against a different batched kernel.
+            for entry_index in range(num_entries):
+                pair_timesteps = timestep_pairs[entry_index].to(device)
+                pair_temb = transformer.time_proj(pair_timesteps)
+                pair_temb = transformer.time_embedder(
+                    pair_temb.to(get_parameter_dtype(transformer.time_embedder))
+                )
+                chunks = projection(pair_temb)
+                if len(chunks) != 6:
+                    raise RuntimeError(
+                        f"block {block_index} returned {len(chunks)} AdaLN chunks"
+                    )
+                modulation = torch.stack(
+                    [chunk.reshape(6, hidden_size) for chunk in chunks],
+                    dim=0,
+                ).to(dtype=torch.bfloat16)
+                table[entry_index, block_index].copy_(modulation.to(device="cpu"))
+                del chunks, modulation, pair_temb
             projection.to("cpu")
-            del chunks, modulation
             torch.cuda.empty_cache()
             logger.info("Grid-1000 AdaLN block {}/50 written", block_index + 1)
 
     # Drop mappings before fsync so dirty pages can be flushed.
     del table
-    del temb
     gc.collect()
     torch.cuda.empty_cache()
     try:
