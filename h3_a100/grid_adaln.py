@@ -1,16 +1,16 @@
 """Grid-quantized sigma + mmap-backed AdaLN lookup for MiniMax-H3.
 
 This branch deliberately changes the DMD renoise-time distribution from a
-continuous uniform base sigma to a uniform 1000-point grid.  All consumers use
+continuous uniform base sigma to a uniform 1000-point grid. All consumers use
 the same quantized base sigma: noise injection, video/audio flow shifts,
-Fake/Teacher score conditioning and AdaLN lookup.  There is therefore no
+Fake/Teacher score conditioning and AdaLN lookup. There is therefore no
 conditioning mismatch; the approximation is only the discrete quadrature over
 sigma.
 
-The offline/cold-start builder writes all AdaLN modulation values to one BF16
-memory-mapped table.  At training startup the original per-block AdaLN modules
-are replaced by parameter-free lookup handles *before FSDP2 wrapping*, so the
-~13B frozen AdaLN parameters are not part of the training model or FSDP units.
+The cold-start builder writes all AdaLN modulation values to one BF16 mmap.
+At training startup the original per-block AdaLN modules are replaced by
+parameter-free lookup handles before FSDP2 wrapping, so the ~13B frozen AdaLN
+parameters are absent from the training model and FSDP units.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class _Scope:
 
 
 class GridAdaLNController:
-    """Load one precomputed 50-block modulation entry at a time from mmap."""
+    """Stage one precomputed 50-block modulation entry at a time from mmap."""
 
     def __init__(
         self,
@@ -161,11 +161,14 @@ class GridAdaLNController:
             return
         index = self._entry_index(timesteps)
         host = self._table[index]
-        # Pin only the selected ~18.5 MiB entry, not the ~19 GiB mmap.
+        # Pin only one selected ~18.5 MiB entry, never the ~18 GiB mmap.
         if self.pin_memory and torch.cuda.is_available():
             host = host.pin_memory()
         device = timesteps.device
-        value = host.to(device=device, non_blocking=self.pin_memory and device.type == "cuda")
+        value = host.to(
+            device=device,
+            non_blocking=self.pin_memory and device.type == "cuda",
+        )
         self._entries[key] = value
         if persistent:
             self._persistent.add(key)
@@ -300,7 +303,7 @@ def install_grid_checkpoint_replay_scope(
     *,
     expected_block_count: int = 50,
 ) -> GridReplayRegistration:
-    """Capture the table key into the checkpoint function stored for replay."""
+    """Capture the table key into the function stored by native checkpoint."""
     original = getattr(transformer, "_gradient_checkpointing_func", None)
     if not callable(original):
         raise RuntimeError("Grid replay requires callable native checkpoint function")
@@ -322,25 +325,30 @@ def install_grid_checkpoint_replay_scope(
         stats["checkpoint_wrap_count"] += 1
 
         def scoped_function(*fn_args: Any, **fn_kwargs: Any) -> Any:
-            before = controller.stats()
-            with controller.scope(key, persistent=persistent):
-                result = function(*fn_args, **fn_kwargs)
-            after = controller.stats()
-            hit_delta = int(after.hits - before.hits)
-            miss_delta = int(after.misses - before.misses)
+            # PyTorch non-reentrant checkpoint can early-stop recomputation via
+            # an internal exception; entry/finally accounting is therefore
+            # required for correct replay census.
+            before_hits = int(controller._hits)
+            before_misses = int(controller._misses)
             stats["scoped_execution_count"] += 1
-            stats["cache_hit_count"] += hit_delta
-            stats["cache_miss_count"] += miss_delta
-            if miss_delta != 0 or hit_delta != 1:
-                raise RuntimeError(
-                    f"Grid checkpoint replay lookup mismatch key={key!r} hits={hit_delta} misses={miss_delta}"
-                )
-            return result
+            try:
+                with controller.scope(key, persistent=persistent):
+                    return function(*fn_args, **fn_kwargs)
+            finally:
+                hit_delta = int(controller._hits) - before_hits
+                miss_delta = int(controller._misses) - before_misses
+                stats["cache_hit_count"] += hit_delta
+                stats["cache_miss_count"] += miss_delta
+                if miss_delta != 0 or hit_delta != 1:
+                    raise RuntimeError(
+                        f"Grid checkpoint replay lookup mismatch key={key!r} "
+                        f"hits={hit_delta} misses={miss_delta}"
+                    )
 
         return original(scoped_function, *args, **kwargs)
 
     transformer._gradient_checkpointing_func = wrapped
-    logger.info("[h3-a100][grid-adaln] installed exact checkpoint table-key replay scope")
+    logger.info("[h3-a100][grid-adaln] installed early-stop-safe checkpoint replay scope")
     return GridReplayRegistration(transformer, controller, original, stats)
 
 
@@ -350,7 +358,7 @@ def _shift_sigma(sigma: torch.Tensor, shift: float) -> torch.Tensor:
 
 def install_grid_trainer_patch() -> None:
     """Patch registered model/trainer classes for the dedicated Grid-1000 branch."""
-    from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
+    from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model, _lora_config
     from .trainer import MiniMaxH3A100DmdTrainer
 
     if getattr(MiniMaxH3A100DmdTrainer, "_grid1000_patch_installed", False):
@@ -379,33 +387,6 @@ def install_grid_trainer_patch() -> None:
         )
 
     def model_prepare(
-        self,
-        *,
-        student_lora,
-        fake_lora,
-        cache_enabled=True,
-        max_dynamic_cache_keys=2,
-    ):
-        del cache_enabled
-        if self._shared_backbone_ready:
-            return
-        manifest = getattr(self, "_grid_adaln_manifest_path", None)
-        if not manifest:
-            raise RuntimeError("Grid model has no table manifest path before prepare_shared_backbone")
-        transformer = self.denoiser_module()
-        transformer.requires_grad_(False)
-        install_grid_adaln_table(
-            transformer,
-            manifest,
-            max_dynamic_keys=max_dynamic_cache_keys,
-            pin_memory=bool(getattr(self, "_grid_adaln_pin_memory", True)),
-        )
-        self._add_named_adapter(STUDENT_ADAPTER, self.__class__.__dict__.get("_lora_config", lambda x: x)(student_lora) if False else None)
-
-    # Reimplement the tiny adapter tail without depending on a private module-level helper.
-    from .model import _lora_config
-
-    def model_prepare_complete(
         self,
         *,
         student_lora,
@@ -475,16 +456,16 @@ def install_grid_trainer_patch() -> None:
         return result
 
     def sample_grid_sigmas(self):
-        # Uniform over the 1000 discrete quadrature points.  Shift is computed
+        # Uniform over the 1000 discrete quadrature points. Shift is computed
         # in float32 on CPU from the exact frozen grid value, then moved to GPU,
-        # ensuring the table timestep pair is bitwise reproducible.
+        # making the table timestep pair bitwise reproducible.
         index = int(torch.randint(self.adaln_grid_size, (), device="cpu").item())
         base = self._grid_base_sigmas_cpu[index]
         video = _shift_sigma(base, float(self.video_shift)).to(self.shared_model.device)
         audio = _shift_sigma(base, float(self.audio_shift)).to(self.shared_model.device)
         return video, audio
 
-    MiniMaxH3A100Model.prepare_shared_backbone = model_prepare_complete
+    MiniMaxH3A100Model.prepare_shared_backbone = model_prepare
     MiniMaxH3A100Model.adaln_cache = model_adaln_cache
     MiniMaxH3A100Model.precompute_adaln = model_precompute
     MiniMaxH3A100Model.drop_adaln_key = model_drop
