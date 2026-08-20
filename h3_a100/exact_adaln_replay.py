@@ -61,6 +61,9 @@ def install_exact_adaln_checkpoint_replay_scope(
         exact AdaLN scope -> boundary CPU staging -> native torch checkpoint
 
     The nested scoped function is what torch checkpoint stores and replays.
+    PyTorch non-reentrant checkpoint may terminate replay through its internal
+    early-stop exception before the user function returns, so replay auditing
+    is performed from ``finally`` rather than after a normal return.
     """
 
     original = getattr(transformer, "_gradient_checkpointing_func", None)
@@ -98,28 +101,30 @@ def install_exact_adaln_checkpoint_replay_scope(
 
         def scoped_function(*fn_args: Any, **fn_kwargs: Any) -> Any:
             before = controller.stats()
-            with controller.scope(key, persistent=persistent):
-                result = function(*fn_args, **fn_kwargs)
-            after = controller.stats()
-            hit_delta = int(after.hits - before.hits)
-            miss_delta = int(after.misses - before.misses)
             stats["scoped_execution_count"] += 1
-            stats["cache_hit_count"] += hit_delta
-            stats["cache_miss_count"] += miss_delta
-            # One H3 main block owns exactly one parameter-free AdaLN handle.
-            # A miss means the replay touched the 13B projection bank again.
-            if miss_delta != 0:
-                raise RuntimeError(
-                    f"Exact AdaLN replay cache miss for key={key!r}; "
-                    f"miss_delta={miss_delta}. Projection fallback is forbidden."
-                )
-            if hit_delta != 1:
-                stats["unexpected_hit_delta_count"] += 1
-                raise RuntimeError(
-                    f"Exact AdaLN replay expected one cache hit per block, got {hit_delta} "
-                    f"for key={key!r}"
-                )
-            return result
+            try:
+                with controller.scope(key, persistent=persistent):
+                    return function(*fn_args, **fn_kwargs)
+            finally:
+                after = controller.stats()
+                hit_delta = int(after.hits - before.hits)
+                miss_delta = int(after.misses - before.misses)
+                stats["cache_hit_count"] += hit_delta
+                stats["cache_miss_count"] += miss_delta
+                # AdaLN is the first block-level conditioning operation, so
+                # even non-reentrant early-stop replay must have consumed the
+                # one cached modulation entry before checkpoint stops.
+                if miss_delta != 0:
+                    raise RuntimeError(
+                        f"Exact AdaLN replay cache miss for key={key!r}; "
+                        f"miss_delta={miss_delta}. Projection fallback is forbidden."
+                    )
+                if hit_delta != 1:
+                    stats["unexpected_hit_delta_count"] += 1
+                    raise RuntimeError(
+                        f"Exact AdaLN replay expected one cache hit per block, got {hit_delta} "
+                        f"for key={key!r}"
+                    )
 
         return original(scoped_function, *args, **kwargs)
 
@@ -184,8 +189,8 @@ def install_trainer_patch() -> None:
             return int(registration.stats[key]) - int(start.get(key, 0))
 
         # 1 Student grad DiT + 5 Fake grad DiTs, 50 checkpointed H3 blocks.
-        # Each checkpointed function executes once in the original forward and
-        # once during backward replay.
+        # Each checkpointed block is entered once in original forward and once
+        # during non-reentrant replay, even if replay exits through early-stop.
         expected = {
             "checkpoint_wrap_count": 300,
             "scoped_execution_count": 600,
