@@ -12,6 +12,7 @@ from loguru import logger
 from . import model as _model  # noqa: F401
 from . import trainer as _trainer  # noqa: F401
 from . import grid_adaln as _grid_adaln  # noqa: F401
+from . import grid_replay_fix as _grid_replay_fix  # noqa: F401
 from . import grid_contract as _grid_contract  # noqa: F401
 from .distributed import init_distributed_a100
 
