@@ -1,0 +1,85 @@
+{
+  "run_id": "iteration_315_grid1000_no_boundary_offload_nsys_20260820",
+  "files": [
+    {
+      "path": "BUG_NSYS_2023_3_CUDA_EVENT_PROCESSING.md",
+      "sha256": "534ea341e177d238a12788a9685ce01dd4ed3904353829bd68971dd2f627770d",
+      "bytes": 1135
+    },
+    {
+      "path": "analysis/analyze_nsys_no_offload.py",
+      "sha256": "dbffb2448e445cdaf737f51253a24a725d12d09dbdd58efd2ffd9dd2388327e0",
+      "bytes": 7370
+    },
+    {
+      "path": "analysis/nsys_no_offload_summary.csv",
+      "sha256": "7d6102215c34a9573c87a3bfdff0a8d0fe35c90eab24ae49dea70aef66bb588a",
+      "bytes": 1407
+    },
+    {
+      "path": "analysis/nsys_no_offload_summary.json",
+      "sha256": "bff4a69808f4c3a00e23619c42a75e426de881440db2fab64dc335e4f9457379",
+      "bytes": 4299
+    },
+    {
+      "path": "logs/node0_train.log",
+      "sha256": "506f75df71cc8f3ecb650be85d730fd40354e3b24965df2c1df9623d89089fbd",
+      "bytes": 4117
+    },
+    {
+      "path": "logs/nsys_parser_error_excerpt.txt",
+      "sha256": "d52f37aa0d52937d096f6b9fc70e81837cfbedef3ee58605a1862638b3fed7e5",
+      "bytes": 4560
+    },
+    {
+      "path": "manifests/failed_attempt_314.txt",
+      "sha256": "1fc144a1bb270c460e2f8adf78d7608e08b45a22bf4647c67f5f2e797a12e401",
+      "bytes": 392
+    },
+    {
+      "path": "manifests/nsys_no_offload_manifest.json",
+      "sha256": "912974c3052f4d843d940e64c664cb93b4d5254c4f7f498ee54f0021c9451052",
+      "bytes": 5223
+    },
+    {
+      "path": "manifests/preflight_local.txt",
+      "sha256": "48145a3cb759634105cec781805ed71a175b83dddb1b79af7b0b82f40bb52365",
+      "bytes": 689
+    },
+    {
+      "path": "raw/README.md",
+      "sha256": "f53c0332697562d083f327fe396f1fb29440831f94c5779973273cb1e952da82",
+      "bytes": 527
+    },
+    {
+      "path": "raw/node0/grid1000_no_offload_node0.nsys-rep",
+      "sha256": "362db7214801ba64bf5ddd04f126824ff161a15066a8f25266903dff799215e0",
+      "bytes": 1325979
+    },
+    {
+      "path": "raw/node0/grid1000_no_offload_node0.sqlite",
+      "sha256": "f80f55a27ab4c699e92a4dfeb2f2ca8458e4c79eaff8f7119cef6862f01405b1",
+      "bytes": 2621440
+    },
+    {
+      "path": "raw/node1/grid1000_no_offload_node1.nsys-rep",
+      "sha256": "50fe82031ffccf5f68600f84bff28cdf77497ba2b65e87fb11cb9d6498396c8e",
+      "bytes": 542649
+    },
+    {
+      "path": "raw/node1/grid1000_no_offload_node1.sqlite",
+      "sha256": "e53f16e778f8981421e0f1cb7d90e9a6dca57c4d373eeb679c2e9f7e657350c2",
+      "bytes": 1232896
+    },
+    {
+      "path": "reports/nsys_no_offload_observed_fragments.png",
+      "sha256": "9b79ddefc09be613a8e7b4c676d90292414ad54b357c60a36ae54b73b4168fa3",
+      "bytes": 82892
+    },
+    {
+      "path": "reports/nsys_no_offload_report.md",
+      "sha256": "8e7b264df8db0ac99f70163bfe019bd8bdf827760728ec4d9a309e52534c307e",
+      "bytes": 4680
+    }
+  ]
+}

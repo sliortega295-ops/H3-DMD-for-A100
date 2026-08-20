@@ -1,0 +1,21 @@
+2026-08-20 09:15:28.598 | INFO | rank=0 | lightx2v_train.runtime.logger:setup_logger:57 - Writing training logs to /tmp/lyy-experiments/DMD-System/iteration_315_grid1000_no_boundary_offload_nsys_20260820/output/node0/train.log
+2026-08-20 09:15:28.598 | INFO | rank=0 | __main__:main:50 - [h3-a100][grid1000] seed=20260817 rank=0
+2026-08-20 09:15:46.376 | INFO | rank=0 | h3_a100.model:_configure_local_flash_attn3:105 - [h3-a100] bound local FlashAttention-3 kernel: /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/hf_home/hub/models--kernels-community--flash-attn3/snapshots/acb0f42e6901d3e9effa8a83bd32bc2bf0cfdfc2/build/torch210-cxx11-cu128-x86_64-linux
+2026-08-20 09:15:50.645 | INFO | rank=0 | h3_a100.model:load_components:195 - [h3-a100] full H3 loaded on CPU; FSDP2/HSDP will move local shards to cuda:0
+2026-08-20 09:15:50.844 | INFO | rank=0 | lightx2v_train.data.video_dataset:__init__:338 - [data] latent_dataset samples=96 repeat=1
+2026-08-20 09:15:50.846 | INFO | rank=0 | lightx2v_train.trainers.dmd.minimax_h3_trainer:__init__:59 - [train] H3 DMD rollout evaluations=4 video_shift=6.0 audio_shift=3.0
+2026-08-20 09:15:51.062 | INFO | rank=0 | h3_a100.grid_adaln:install_grid_adaln_table:277 - [h3-a100][grid-adaln] installed manifest=/share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/grid1000_adaln_20260820/table/adaln_grid1000.json dropped_params=13010457600 (13.010B) mmap_gib=18.10
+2026-08-20 09:16:02.663 | INFO | rank=0 | h3_a100.grid_adaln:model_prepare:418 - [h3-a100][grid-adaln] shared non-AdaLN backbone ready student_lora=691798016 fake_lora=691798016
+2026-08-20 09:16:02.664 | INFO | rank=0 | h3_a100.model:configure_activation_checkpoint_segments:253 - [h3-a100] activation checkpoint segment_size=1 (upstream per-block policy)
+2026-08-20 09:16:37.641 | INFO | rank=0 | lightx2v_train.runtime.fsdp:apply_fsdp2:78 - FSDP2 transformer sharded: allocated 0.00 -> 2.50 GiB, reserved 0.00 -> 2.55 GiB
+2026-08-20 09:16:37.951 | INFO | rank=0 | h3_a100.trainer_loop:_log_cuda_memory:321 - [h3-a100][memory] stage=after_setup allocated_gib=2.50 reserved_gib=2.55 peak_gib=3.26
+2026-08-20 09:16:37.952 | INFO | rank=0 | h3_a100.trainer:setup:227 - [h3-a100] setup physical_backbones=1 logical_roles=3 student_params=691798016 fake_params=691798016 fsdp=True critic_reorder=True matched_compute=True
+2026-08-20 09:16:37.952 | INFO | rank=0 | h3_a100.trainer:setup:236 - [h3-a100] activation policy=none checkpoint_segment=1 boundary_pin=True boundary_events=False legacy_threshold_offload=False
+2026-08-20 09:16:37.952 | INFO | rank=0 | h3_a100.grid_adaln:install_grid_checkpoint_replay_scope:351 - [h3-a100][grid-adaln] installed early-stop-safe checkpoint replay scope
+2026-08-20 09:16:39.533 | INFO | rank=0 | h3_a100.trainer_loop:train:42 - [h3-a100] train start iter=0/1 world=16 grad_accum=1 fake_ratio=5 reorder=True
+2026-08-20 09:31:38.365 | INFO | rank=0 | h3_a100.trainer_loop:_validate_matched_cycle:283 - [h3-a100][matched] iter=0 rank=0 forwards={'student': 24, 'fake': 6, 'teacher': 1} grad_forwards={'student': 1, 'fake': 5, 'teacher': 0} backwards={'student': 1, 'fake': 5} samples=6 world=16
+2026-08-20 09:31:38.373 | INFO | rank=0 | h3_a100.grid_contract:validate_cycle:67 - [h3-a100][grid1000-contract] iter=0 replay={'checkpoint_wrap_count': 300, 'scoped_execution_count': 600, 'cache_hit_count': 600, 'cache_miss_count': 0, 'missing_key_count': 0} dropped_adaln_params=13010457600 cache_mib=73.83
+2026-08-20 09:31:38.374 | INFO | rank=0 | h3_a100.trainer_loop:train:70 - [h3-a100] iter=1/1 dmd=0.000000 fake=0.292139 lr=0.00010000
+2026-08-20 09:31:38.374 | INFO | rank=0 | h3_a100.model:log_adaln_stats:442 - [h3-a100] AdaLN cache hits=1850 misses=0 stores=10 evictions=0 persistent_keys=4 dynamic_keys=0 memory_mib=73.83
+2026-08-20 09:31:38.375 | INFO | rank=0 | h3_a100.trainer_loop:_log_cuda_memory:321 - [h3-a100][memory] stage=iter_1 allocated_gib=2.92 reserved_gib=38.60 peak_gib=35.95
+2026-08-20 09:31:38.375 | INFO | rank=0 | h3_a100.trainer_loop:train:92 - [h3-a100] train finished iter=1/1

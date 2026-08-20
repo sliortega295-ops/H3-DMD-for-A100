@@ -1,0 +1,5 @@
+run_id=iteration_314_grid1000_no_boundary_offload_nsys_20260820
+status=FAIL_PROFILE_FINALIZATION
+facts=world16 one-cycle workload completed and matched/grid contracts passed; Nsight produced a 310MB qdstrm but wait=all left nsys launcher hung, so no nsys-rep/sqlite was produced.
+qdstrm=/tmp/nsys-report-0c43.qdstrm (not used as a report)
+source_head=75c837fac356a50883bed6963dc4bf96218d99c8

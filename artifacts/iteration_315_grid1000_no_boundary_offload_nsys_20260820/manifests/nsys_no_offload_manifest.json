@@ -1,0 +1,153 @@
+{
+  "run_id": "iteration_315_grid1000_no_boundary_offload_nsys_20260820",
+  "status": "PROFILE_PARTIAL_FAIL_NOT_USABLE_WORLD16",
+  "purpose": "Nsight diagnostic for Grid1000 MiniMax-H3 one-cycle with checkpoint-boundary offload disabled",
+  "source_head": "75c837fac356a50883bed6963dc4bf96218d99c8",
+  "lightx2v_head": "d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be",
+  "hardware": "2 nodes x 8 A100-40GB, world16",
+  "workload": "Grid1000 approximate MiniMax-H3, one outer cycle Student1+Fake5, 768x1344x124, BF16, B1/rank, fixed end_step_idx=3",
+  "activation_checkpoint_segment": 1,
+  "activation_policy": "none",
+  "checkpoint_boundary_cpu_offload": false,
+  "parameter_offload": false,
+  "model_swap": false,
+  "formal_timing": false,
+  "nsys_version": "2023.3.1.92-233133147223v0",
+  "trace": "cuda,nvtx",
+  "profile_script": "scripts/profile_grid_no_boundary_offload_node.sh",
+  "failed_predecessor": "iteration_314_grid1000_no_boundary_offload_nsys_20260820: wait=all left only qdstrm",
+  "status_reasons": [
+    "node0:kernel_devices=[2, 7]",
+    "node0:processing_error",
+    "node1:missing_phase",
+    "node1:kernel_devices=[4]",
+    "node1:processing_error"
+  ],
+  "correctness_evidence": "logs/node0_train.log: matched census PASS, grid replay PASS, train finished",
+  "nodes": {
+    "node0": {
+      "sqlite": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node0/grid1000_no_offload_node0.sqlite",
+      "sqlite_sha256": "f80f55a27ab4c699e92a4dfeb2f2ca8458e4c79eaff8f7119cef6862f01405b1",
+      "nvtx_ranges": [
+        [
+          379380699110,
+          1053983594072,
+          "h3/student_step",
+          674.602894962
+        ],
+        [
+          1053983646512,
+          1283260755088,
+          "h3/critic_update_F",
+          229.277108576
+        ]
+      ],
+      "workload_window_ns": [
+        379380699110,
+        1283260755088
+      ],
+      "workload_window_s": 903.880055978,
+      "phase_complete": true,
+      "capture_processing_errors": [
+        "nsys_report_processing_error"
+      ],
+      "kernel_events_total": 3853,
+      "kernel_events_in_nvtx": 3853,
+      "kernel_devices_in_nvtx": [
+        2,
+        7
+      ],
+      "kernel_device_coverage": 0.25,
+      "kernel_union_s_observed": 21.403604538,
+      "known_compute_union_s": 0.000527586,
+      "known_nccl_union_s": 0.002081868,
+      "known_nccl_exposed_vs_known_compute_s": 0.002081868,
+      "unresolved_kernel_union_s": 21.400995084,
+      "kernel_sum_duration_s": 21.763343682,
+      "kernel_coverage_vs_window_observed": 0.02367969554858831,
+      "h2d_events_nvtx": 72,
+      "h2d_bytes_nvtx": 20622304,
+      "h2d_union_s_nvtx": 0.001306254,
+      "d2h_events_nvtx": 0,
+      "d2h_bytes_nvtx": 0,
+      "d2h_union_s_nvtx": 0.0,
+      "h2d_events_full": 169,
+      "h2d_bytes_full": 2657115104,
+      "d2h_events_full": 0,
+      "d2h_bytes_full": 0,
+      "copy_kind8_events_nvtx": 1,
+      "copy_kind8_bytes_nvtx": 1248,
+      "phases": {
+        "h3/student_step": {
+          "wall_s": 674.602894962,
+          "kernel_union_s": 15.860368907,
+          "known_nccl_union_s": 0.002081868,
+          "d2h_bytes": 0,
+          "d2h_events": 0
+        },
+        "h3/critic_update_F": {
+          "wall_s": 229.277108576,
+          "kernel_union_s": 5.543235631,
+          "known_nccl_union_s": 0.0,
+          "d2h_bytes": 0,
+          "d2h_events": 0
+        }
+      }
+    },
+    "node1": {
+      "sqlite": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_315_grid1000_no_boundary_offload_nsys_20260820/raw/node1/grid1000_no_offload_node1.sqlite",
+      "sqlite_sha256": "e53f16e778f8981421e0f1cb7d90e9a6dca57c4d373eeb679c2e9f7e657350c2",
+      "nvtx_ranges": [
+        [
+          369931370760,
+          1273661511529,
+          "h3/student_step",
+          903.730140769
+        ]
+      ],
+      "workload_window_ns": [
+        369931370760,
+        1273661511529
+      ],
+      "workload_window_s": 903.730140769,
+      "phase_complete": false,
+      "capture_processing_errors": [
+        "nsys_report_processing_error"
+      ],
+      "kernel_events_total": 20,
+      "kernel_events_in_nvtx": 20,
+      "kernel_devices_in_nvtx": [
+        4
+      ],
+      "kernel_device_coverage": 0.125,
+      "kernel_union_s_observed": 0.55096832,
+      "known_compute_union_s": 0.0,
+      "known_nccl_union_s": 0.0,
+      "known_nccl_exposed_vs_known_compute_s": 0.0,
+      "unresolved_kernel_union_s": 0.55096832,
+      "kernel_sum_duration_s": 0.55096832,
+      "kernel_coverage_vs_window_observed": 0.0006096602239371715,
+      "h2d_events_nvtx": 30,
+      "h2d_bytes_nvtx": 501800,
+      "h2d_union_s_nvtx": 0.000124353,
+      "d2h_events_nvtx": 2,
+      "d2h_bytes_nvtx": 8,
+      "d2h_union_s_nvtx": 6.368e-06,
+      "h2d_events_full": 108,
+      "h2d_bytes_full": 2310820904,
+      "d2h_events_full": 2,
+      "d2h_bytes_full": 8,
+      "copy_kind8_events_nvtx": 0,
+      "copy_kind8_bytes_nvtx": 0,
+      "phases": {
+        "h3/student_step": {
+          "wall_s": 903.730140769,
+          "kernel_union_s": 0.55096832,
+          "known_nccl_union_s": 0.0,
+          "d2h_bytes": 8,
+          "d2h_events": 2
+        }
+      }
+    }
+  }
+}
