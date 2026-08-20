@@ -1,0 +1,747 @@
+{
+  "block_post_maxima": [
+    {
+      "block": 0,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 1,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 2,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 3,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 4,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 5,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 6,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 7,
+      "max_allocated_gib": 7.364518642425537,
+      "max_reserved_gib": 18.591796875,
+      "min_free_gib": 19.9886474609375,
+      "observations": 6
+    },
+    {
+      "block": 8,
+      "max_allocated_gib": 34.77835988998413,
+      "max_reserved_gib": 36.900390625,
+      "min_free_gib": 1.6722412109375,
+      "observations": 7
+    },
+    {
+      "block": 9,
+      "max_allocated_gib": 37.07175350189209,
+      "max_reserved_gib": 38.501953125,
+      "min_free_gib": 0.0706787109375,
+      "observations": 7
+    },
+    {
+      "block": 10,
+      "max_allocated_gib": 36.585527420043945,
+      "max_reserved_gib": 37.994140625,
+      "min_free_gib": 0.5784912109375,
+      "observations": 7
+    },
+    {
+      "block": 11,
+      "max_allocated_gib": 36.0993013381958,
+      "max_reserved_gib": 37.564453125,
+      "min_free_gib": 1.0081787109375,
+      "observations": 7
+    },
+    {
+      "block": 12,
+      "max_allocated_gib": 35.613075256347656,
+      "max_reserved_gib": 37.056640625,
+      "min_free_gib": 1.5159912109375,
+      "observations": 7
+    },
+    {
+      "block": 13,
+      "max_allocated_gib": 35.12684917449951,
+      "max_reserved_gib": 36.548828125,
+      "min_free_gib": 2.0238037109375,
+      "observations": 7
+    },
+    {
+      "block": 14,
+      "max_allocated_gib": 34.64062309265137,
+      "max_reserved_gib": 38.455078125,
+      "min_free_gib": 0.1175537109375,
+      "observations": 7
+    },
+    {
+      "block": 15,
+      "max_allocated_gib": 34.15439701080322,
+      "max_reserved_gib": 37.966796875,
+      "min_free_gib": 0.6058349609375,
+      "observations": 7
+    },
+    {
+      "block": 16,
+      "max_allocated_gib": 33.66817092895508,
+      "max_reserved_gib": 37.498046875,
+      "min_free_gib": 1.0745849609375,
+      "observations": 7
+    },
+    {
+      "block": 17,
+      "max_allocated_gib": 33.181944847106934,
+      "max_reserved_gib": 37.009765625,
+      "min_free_gib": 1.5628662109375,
+      "observations": 7
+    },
+    {
+      "block": 18,
+      "max_allocated_gib": 32.69571876525879,
+      "max_reserved_gib": 36.521484375,
+      "min_free_gib": 2.0511474609375,
+      "observations": 7
+    },
+    {
+      "block": 19,
+      "max_allocated_gib": 32.209492683410645,
+      "max_reserved_gib": 36.033203125,
+      "min_free_gib": 2.5394287109375,
+      "observations": 7
+    },
+    {
+      "block": 20,
+      "max_allocated_gib": 31.7232666015625,
+      "max_reserved_gib": 35.544921875,
+      "min_free_gib": 3.0277099609375,
+      "observations": 7
+    },
+    {
+      "block": 21,
+      "max_allocated_gib": 31.237040519714355,
+      "max_reserved_gib": 35.056640625,
+      "min_free_gib": 3.5159912109375,
+      "observations": 7
+    },
+    {
+      "block": 22,
+      "max_allocated_gib": 30.75081443786621,
+      "max_reserved_gib": 34.587890625,
+      "min_free_gib": 3.9847412109375,
+      "observations": 7
+    },
+    {
+      "block": 23,
+      "max_allocated_gib": 30.264588356018066,
+      "max_reserved_gib": 34.099609375,
+      "min_free_gib": 4.4730224609375,
+      "observations": 7
+    },
+    {
+      "block": 24,
+      "max_allocated_gib": 29.778362274169922,
+      "max_reserved_gib": 33.611328125,
+      "min_free_gib": 4.9613037109375,
+      "observations": 7
+    },
+    {
+      "block": 25,
+      "max_allocated_gib": 29.292136192321777,
+      "max_reserved_gib": 33.123046875,
+      "min_free_gib": 5.4495849609375,
+      "observations": 7
+    },
+    {
+      "block": 26,
+      "max_allocated_gib": 28.805910110473633,
+      "max_reserved_gib": 32.615234375,
+      "min_free_gib": 5.9573974609375,
+      "observations": 7
+    },
+    {
+      "block": 27,
+      "max_allocated_gib": 28.31968402862549,
+      "max_reserved_gib": 32.146484375,
+      "min_free_gib": 6.4261474609375,
+      "observations": 7
+    },
+    {
+      "block": 28,
+      "max_allocated_gib": 27.833457946777344,
+      "max_reserved_gib": 31.658203125,
+      "min_free_gib": 6.9144287109375,
+      "observations": 7
+    },
+    {
+      "block": 29,
+      "max_allocated_gib": 27.3472318649292,
+      "max_reserved_gib": 31.169921875,
+      "min_free_gib": 7.4027099609375,
+      "observations": 7
+    },
+    {
+      "block": 30,
+      "max_allocated_gib": 26.861005783081055,
+      "max_reserved_gib": 30.681640625,
+      "min_free_gib": 7.8909912109375,
+      "observations": 7
+    },
+    {
+      "block": 31,
+      "max_allocated_gib": 26.37477970123291,
+      "max_reserved_gib": 30.193359375,
+      "min_free_gib": 8.3792724609375,
+      "observations": 7
+    },
+    {
+      "block": 32,
+      "max_allocated_gib": 25.888553619384766,
+      "max_reserved_gib": 29.724609375,
+      "min_free_gib": 8.8480224609375,
+      "observations": 7
+    },
+    {
+      "block": 33,
+      "max_allocated_gib": 25.40232753753662,
+      "max_reserved_gib": 29.236328125,
+      "min_free_gib": 9.3363037109375,
+      "observations": 7
+    },
+    {
+      "block": 34,
+      "max_allocated_gib": 24.916101455688477,
+      "max_reserved_gib": 28.748046875,
+      "min_free_gib": 9.8245849609375,
+      "observations": 7
+    },
+    {
+      "block": 35,
+      "max_allocated_gib": 24.429875373840332,
+      "max_reserved_gib": 28.259765625,
+      "min_free_gib": 10.3128662109375,
+      "observations": 7
+    },
+    {
+      "block": 36,
+      "max_allocated_gib": 23.943649291992188,
+      "max_reserved_gib": 27.771484375,
+      "min_free_gib": 10.8011474609375,
+      "observations": 7
+    },
+    {
+      "block": 37,
+      "max_allocated_gib": 23.457423210144043,
+      "max_reserved_gib": 27.302734375,
+      "min_free_gib": 11.2698974609375,
+      "observations": 7
+    },
+    {
+      "block": 38,
+      "max_allocated_gib": 22.9711971282959,
+      "max_reserved_gib": 26.814453125,
+      "min_free_gib": 11.7581787109375,
+      "observations": 7
+    },
+    {
+      "block": 39,
+      "max_allocated_gib": 22.484971046447754,
+      "max_reserved_gib": 26.306640625,
+      "min_free_gib": 12.2659912109375,
+      "observations": 7
+    },
+    {
+      "block": 40,
+      "max_allocated_gib": 21.99874496459961,
+      "max_reserved_gib": 25.818359375,
+      "min_free_gib": 12.7542724609375,
+      "observations": 7
+    },
+    {
+      "block": 41,
+      "max_allocated_gib": 21.512518882751465,
+      "max_reserved_gib": 25.330078125,
+      "min_free_gib": 13.2425537109375,
+      "observations": 7
+    },
+    {
+      "block": 42,
+      "max_allocated_gib": 21.02629280090332,
+      "max_reserved_gib": 24.861328125,
+      "min_free_gib": 13.7113037109375,
+      "observations": 7
+    },
+    {
+      "block": 43,
+      "max_allocated_gib": 20.540066719055176,
+      "max_reserved_gib": 24.373046875,
+      "min_free_gib": 14.1995849609375,
+      "observations": 7
+    },
+    {
+      "block": 44,
+      "max_allocated_gib": 20.05384063720703,
+      "max_reserved_gib": 23.884765625,
+      "min_free_gib": 14.6878662109375,
+      "observations": 7
+    },
+    {
+      "block": 45,
+      "max_allocated_gib": 19.567614555358887,
+      "max_reserved_gib": 23.396484375,
+      "min_free_gib": 15.1761474609375,
+      "observations": 7
+    },
+    {
+      "block": 46,
+      "max_allocated_gib": 19.081388473510742,
+      "max_reserved_gib": 22.908203125,
+      "min_free_gib": 15.6644287109375,
+      "observations": 7
+    },
+    {
+      "block": 47,
+      "max_allocated_gib": 18.595162391662598,
+      "max_reserved_gib": 22.439453125,
+      "min_free_gib": 16.1331787109375,
+      "observations": 7
+    },
+    {
+      "block": 48,
+      "max_allocated_gib": 18.108936309814453,
+      "max_reserved_gib": 21.951171875,
+      "min_free_gib": 16.6214599609375,
+      "observations": 7
+    },
+    {
+      "block": 49,
+      "max_allocated_gib": 17.57314968109131,
+      "max_reserved_gib": 21.072265625,
+      "min_free_gib": 17.5003662109375,
+      "observations": 7
+    }
+  ],
+  "block_traversals": [
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 6.857933044433594,
+      "max_block": 49,
+      "max_reserved_gib": 17.54296875,
+      "min_block": 0,
+      "min_free_gib": 21.0863037109375,
+      "occurrence": 1,
+      "rows": 100,
+      "traversal_role": "complete_grad_or_application_block_traversal"
+    },
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 6.902743816375732,
+      "max_block": 49,
+      "max_reserved_gib": 17.638671875,
+      "min_block": 0,
+      "min_free_gib": 20.9906005859375,
+      "occurrence": 2,
+      "rows": 100,
+      "traversal_role": "complete_grad_or_application_block_traversal"
+    },
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 6.9207682609558105,
+      "max_block": 49,
+      "max_reserved_gib": 17.67578125,
+      "min_block": 0,
+      "min_free_gib": 20.9534912109375,
+      "occurrence": 3,
+      "rows": 100,
+      "traversal_role": "complete_grad_or_application_block_traversal"
+    },
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 6.939393997192383,
+      "max_block": 49,
+      "max_reserved_gib": 17.693359375,
+      "min_block": 0,
+      "min_free_gib": 20.8870849609375,
+      "occurrence": 4,
+      "rows": 100,
+      "traversal_role": "complete_grad_or_application_block_traversal"
+    },
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 7.740673542022705,
+      "max_block": 49,
+      "max_reserved_gib": 18.591796875,
+      "min_block": 0,
+      "min_free_gib": 19.9886474609375,
+      "occurrence": 5,
+      "rows": 100,
+      "traversal_role": "complete_grad_or_application_block_traversal"
+    },
+    {
+      "block_count": 50,
+      "complete_50_blocks": true,
+      "max_allocated_gib": 37.07175350189209,
+      "max_block": 49,
+      "max_reserved_gib": 38.501953125,
+      "min_block": 0,
+      "min_free_gib": 0.0706787109375,
+      "occurrence": 6,
+      "rows": 184,
+      "traversal_role": "last_complete_plus_partial_recompute_merged_by_log_order"
+    }
+  ],
+  "block_traversals_note": "The log has six complete 0..49 traversals; after the sixth block_49_post, a partial descending backward recompute traverses 49..8. The simple occurrence grouping merges that partial suffix with occurrence 6; use block_post_maxima and the note for the exact boundary.",
+  "boundary_partial": {
+    "expected_per_cycle": {
+      "cpu_copy_count": 300,
+      "grad_checkpoint_call_count": 300,
+      "grad_transformer_forward_count": 6
+    },
+    "formal_status": "NOT_REACHED",
+    "last_observed": {
+      "cpu_copy_count": 50,
+      "offloaded_logical_bytes": 20283648000,
+      "offloaded_storage_bytes": 20283648000,
+      "pack_count": 200,
+      "unpack_count": 0
+    },
+    "observed_before_failure": {
+      "cpu_copy_count": 50,
+      "offloaded_logical_bytes": 20283648000,
+      "offloaded_storage_bytes": 20283648000,
+      "pack_count": 200,
+      "unpack_count": 0
+    }
+  },
+  "claim_boundary": {
+    "application_census": "NOT_REACHED",
+    "capacity": "FAIL",
+    "formal_boundary_census": "NOT_REACHED",
+    "full5": "NOT_RUN",
+    "timing": "NOT_RUN"
+  },
+  "comparison_reference": {
+    "DMD-System_native": {
+      "allocated_gib": 27.94,
+      "source": "user-frozen result",
+      "status": "PASS",
+      "wall_s": 917.993973
+    },
+    "DMD-System_phase_cluster": {
+      "allocated_gib": 28.1,
+      "source": "user-frozen result",
+      "status": "PASS",
+      "wall_s": 914.102536
+    },
+    "H3_shared_boundary_policy": {
+      "allocated_gib": "FAIL before completed cycle",
+      "status": "FAIL_CUDA_OOM",
+      "wall_s": null
+    }
+  },
+  "diagnostic_changes": [
+    "opt-in H3_MEMORY_ATTRIBUTION residency logs",
+    "opt-in H3_MEMORY_ATTRIBUTION_BLOCKS block hooks"
+  ],
+  "evidence": {
+    "proven": [
+      "Student grad forward reached post-forward boundary logs; boundary CPU copy count reached 50 and 20,283,648,000 logical/storage bytes; OOM thrown in Student backward checkpoint recompute at PEFT LoRA FFN projection; no cgroup OOM increment; construction/static setup fit at 4.02 GiB representative allocation.",
+      "All 16 global ranks emitted the same CUDA OOM class (rank0-7 in node0 and rank8-15 in node1); the 17 textual OOM records include one duplicated launcher/root record."
+    ],
+    "strong_inference": [
+      "Peak is dominated by backward recompute transient/workspace plus FSDP parameter materialization, not static shared-base parameter residency alone; at least six complete block traversals were observed before a seventh partial descending traversal; the highest confirmed post hook before failure was block 8 at ~34.78 GiB allocated, while block 9 post reached ~37.07 GiB allocated."
+    ],
+    "unresolved": [
+      "Exact ~9-10 GiB gap versus DMD-System 27.94 GiB; contribution of checkpoint implementation/metadata context, shared adapters, AdaLN/FSDP lifecycle, allocator behavior, or offloader implementation has not been isolated. Exact failing logical block for the allocation request is unresolved; traceback is in a LoRA projection during checkpoint unpack/recompute."
+    ]
+  },
+  "logs": {
+    "rank_in_log": 0,
+    "raw_log_sha256": "d6f1158391a6958b720b7a251d8aff4945f18da92d790e84b4bac1f5cd5961f3",
+    "representative_log": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_308_shared_backbone_block_attribution_20260819/logs/node0/output_train.log",
+    "residency_rows": 687
+  },
+  "oom": {
+    "cgroup_oom_delta": 0,
+    "cgroup_oom_kill_delta": 0,
+    "error_count": 17,
+    "error_count_in_captured_logs": 17,
+    "examples": [
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.65,
+        "gpu": 5,
+        "process_gib": 37.68,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 109.6,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 0,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.61,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.66,
+        "gpu": 2,
+        "process_gib": 37.67,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.61,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.63,
+        "gpu": 4,
+        "process_gib": 37.71,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.28,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.68,
+        "gpu": 1,
+        "process_gib": 37.65,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.28,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.63,
+        "gpu": 3,
+        "process_gib": 37.71,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.28,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 7,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 111.29,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 6,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.61,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 0,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 109.6,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.65,
+        "gpu": 5,
+        "process_gib": 37.68,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.95,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.68,
+        "gpu": 1,
+        "process_gib": 37.65,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.61,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 0,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 109.6,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.63,
+        "gpu": 3,
+        "process_gib": 37.71,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.28,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.63,
+        "gpu": 4,
+        "process_gib": 37.71,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 109.94,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.66,
+        "gpu": 2,
+        "process_gib": 37.67,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 109.94,
+        "total_gib": 39.39
+      },
+      {
+        "attempted_gib": 2.02,
+        "free_gib": 1.67,
+        "gpu": 7,
+        "process_gib": 37.66,
+        "pytorch_allocated_gib": 36.79,
+        "reserved_unallocated_mib": 110.95,
+        "total_gib": 39.39
+      }
+    ],
+    "node0_historical_oom_kill": 4,
+    "node1_historical_oom_kill": 0,
+    "unique_failed_global_rank_count": 16,
+    "unique_failed_global_ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "policy": {
+    "activation_policy": "checkpoint_boundary_cpu",
+    "boundary_events": false,
+    "checkpoint_segment": 1,
+    "cp_sp": false,
+    "legacy_threshold_offload": false,
+    "model_swap": 0,
+    "parameter_offload": false,
+    "pin_memory": true
+  },
+  "representative_memory_gib": {
+    "after_student_grad_forward": {
+      "allocated": 5.013742923736572,
+      "free": 19.9886474609375,
+      "reserved": 18.591796875
+    },
+    "before_student_backward": {
+      "allocated": 5.013742923736572,
+      "free": 19.9886474609375,
+      "reserved": 18.591796875
+    },
+    "before_student_grad_forward": {
+      "allocated": 4.0193867683410645,
+      "free": 34.5765380859375,
+      "reserved": 4.0703125
+    },
+    "max_observed": {
+      "allocated": 37.07175350189209,
+      "free": 0.0706787109375,
+      "occurrence": 6,
+      "reserved": 38.501953125,
+      "stage": "block_9_post"
+    },
+    "max_reserved": {
+      "allocated": 37.07175350189209,
+      "free": 0.0706787109375,
+      "occurrence": 6,
+      "reserved": 38.501953125,
+      "stage": "block_9_post"
+    },
+    "min_driver_free": {
+      "allocated": 37.07175350189209,
+      "free": 0.0706787109375,
+      "occurrence": 6,
+      "reserved": 38.501953125,
+      "stage": "block_9_post"
+    }
+  },
+  "run_id": "iteration_308_shared_backbone_block_attribution_20260819",
+  "source": {
+    "base_origin_head": "b7508ea1ea8f1909545ded15ae2be314f6afa093",
+    "branch": "agent/h3-a100-shared-backbone",
+    "head": "316d2ad38b395ee8547840ca299181f34ecb860e",
+    "repository": "H3-DMD-for-A100",
+    "upstream_lightx2v": "d034a6b0ecaa31aa07c81aeb7bbe69b225f1d7be"
+  },
+  "status": "FAIL_CUDA_OOM_DURING_STUDENT_BACKWARD_RECOMPUTE",
+  "workload": {
+    "attention": "_flash_3_hub",
+    "batch_per_rank": 1,
+    "dtype": "bf16",
+    "end_step_idx": 3,
+    "fake_lora_rank": 128,
+    "fake_updates": 5,
+    "frames": 124,
+    "global_batch": 16,
+    "gpus_per_node": 8,
+    "nodes": 2,
+    "resolution": "768x1344",
+    "steps": 4,
+    "student_lora_rank": 128,
+    "student_updates": 1,
+    "teacher": "shared_base_adapters_disabled",
+    "world_size": 16
+  }
+}

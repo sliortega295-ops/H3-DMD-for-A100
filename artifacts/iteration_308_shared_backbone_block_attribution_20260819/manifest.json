@@ -1,0 +1,12 @@
+{
+  "run_id": "iteration_308_shared_backbone_block_attribution_20260819",
+  "created_utc": "2026-08-19T15:34:41.419072+00:00",
+  "status": "FAIL_CUDA_OOM_DURING_STUDENT_BACKWARD_RECOMPUTE",
+  "source_head": "316d2ad38b395ee8547840ca299181f34ecb860e",
+  "artifacts": [
+    "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.csv",
+    "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.json",
+    "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.md",
+    "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.png"
+  ]
+}

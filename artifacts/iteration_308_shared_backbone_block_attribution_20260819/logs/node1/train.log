@@ -1,0 +1,569 @@
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/io/image.py:14: UserWarning: Failed to load image Python extension: 'Could not load this library: /tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torchvision/image.so'If you don't plan on using image functionality from `torchvision.io`, you can ignore this warning. Otherwise, there might be something wrong with your environment. Did you have `libjpeg` or `libpng` installed before building `torchvision` from source?
+  warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+[rank13]: Traceback (most recent call last):
+[rank13]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank13]:     return _run_code(code, main_globals, None,
+[rank13]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank13]:     exec(code, run_globals)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank13]:     main()
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank13]:     trainer.train()
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank13]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank13]:     (result["loss"] / grad_accum_iters).backward()
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank13]:     torch.autograd.backward(
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank13]:     _engine_run_backward(
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank13]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank13]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank13]:     return disable_fn(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank13]:     return fn(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank13]:     return fn(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank13]:     fn(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank13]:     return self._call_impl(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank13]:     return inner()
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank13]:     result = forward_call(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank13]:     ff_output = self.ff(norm_hidden_states)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank13]:     return self._call_impl(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank13]:     return forward_call(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank13]:     hidden_states = module(hidden_states)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank13]:     return self._call_impl(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank13]:     return forward_call(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank13]:     hidden_states = self.proj(hidden_states)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank13]:     return self._call_impl(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank13]:     return forward_call(*args, **kwargs)
+[rank13]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank13]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank13]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 5 has a total capacity of 39.39 GiB of which 1.65 GiB is free. Process 63879 has 37.68 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 109.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank8]: Traceback (most recent call last):
+[rank8]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank8]:     return _run_code(code, main_globals, None,
+[rank8]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank8]:     exec(code, run_globals)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank8]:     main()
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank8]:     trainer.train()
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank8]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank8]:     (result["loss"] / grad_accum_iters).backward()
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank8]:     torch.autograd.backward(
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank8]:     _engine_run_backward(
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank8]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank8]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank8]:     return disable_fn(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank8]:     return fn(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank8]:     return fn(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank8]:     fn(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank8]:     return self._call_impl(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank8]:     return inner()
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank8]:     result = forward_call(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank8]:     ff_output = self.ff(norm_hidden_states)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank8]:     return self._call_impl(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank8]:     return forward_call(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank8]:     hidden_states = module(hidden_states)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank8]:     return self._call_impl(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank8]:     return forward_call(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank8]:     hidden_states = self.proj(hidden_states)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank8]:     return self._call_impl(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank8]:     return forward_call(*args, **kwargs)
+[rank8]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank8]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank8]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 0 has a total capacity of 39.39 GiB of which 1.67 GiB is free. Process 63874 has 37.66 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank10]: Traceback (most recent call last):
+[rank10]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank10]:     return _run_code(code, main_globals, None,
+[rank10]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank10]:     exec(code, run_globals)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank10]:     main()
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank10]:     trainer.train()
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank10]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank10]:     (result["loss"] / grad_accum_iters).backward()
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank10]:     torch.autograd.backward(
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank10]:     _engine_run_backward(
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank10]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank10]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank10]:     return disable_fn(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank10]:     return fn(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank10]:     return fn(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank10]:     fn(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank10]:     return self._call_impl(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank10]:     return inner()
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank10]:     result = forward_call(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank10]:     ff_output = self.ff(norm_hidden_states)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank10]:     return self._call_impl(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank10]:     return forward_call(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank10]:     hidden_states = module(hidden_states)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank10]:     return self._call_impl(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank10]:     return forward_call(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank10]:     hidden_states = self.proj(hidden_states)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank10]:     return self._call_impl(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank10]:     return forward_call(*args, **kwargs)
+[rank10]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank10]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank10]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 2 has a total capacity of 39.39 GiB of which 1.66 GiB is free. Process 63876 has 37.67 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank12]: Traceback (most recent call last):
+[rank12]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank12]:     return _run_code(code, main_globals, None,
+[rank12]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank12]:     exec(code, run_globals)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank12]:     main()
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank12]:     trainer.train()
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank12]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank12]:     (result["loss"] / grad_accum_iters).backward()
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank12]:     torch.autograd.backward(
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank12]:     _engine_run_backward(
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank12]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank12]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank12]:     return disable_fn(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank12]:     return fn(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank12]:     return fn(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank12]:     fn(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank12]:     return self._call_impl(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank12]:     return inner()
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank12]:     result = forward_call(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank12]:     ff_output = self.ff(norm_hidden_states)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank12]:     return self._call_impl(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank12]:     return forward_call(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank12]:     hidden_states = module(hidden_states)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank12]:     return self._call_impl(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank12]:     return forward_call(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank12]:     hidden_states = self.proj(hidden_states)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank12]:     return self._call_impl(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank12]:     return forward_call(*args, **kwargs)
+[rank12]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank12]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank12]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 4 has a total capacity of 39.39 GiB of which 1.63 GiB is free. Process 63878 has 37.71 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.28 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank9]: Traceback (most recent call last):
+[rank9]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank9]:     return _run_code(code, main_globals, None,
+[rank9]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank9]:     exec(code, run_globals)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank9]:     main()
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank9]:     trainer.train()
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank9]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank9]:     (result["loss"] / grad_accum_iters).backward()
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank9]:     torch.autograd.backward(
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank9]:     _engine_run_backward(
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank9]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank9]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank9]:     return disable_fn(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank9]:     return fn(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank9]:     return fn(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank9]:     fn(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank9]:     return self._call_impl(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank9]:     return inner()
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank9]:     result = forward_call(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank9]:     ff_output = self.ff(norm_hidden_states)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank9]:     return self._call_impl(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank9]:     return forward_call(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank9]:     hidden_states = module(hidden_states)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank9]:     return self._call_impl(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank9]:     return forward_call(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank9]:     hidden_states = self.proj(hidden_states)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank9]:     return self._call_impl(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank9]:     return forward_call(*args, **kwargs)
+[rank9]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank9]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank9]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 1 has a total capacity of 39.39 GiB of which 1.68 GiB is free. Process 63875 has 37.65 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.28 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank11]: Traceback (most recent call last):
+[rank11]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank11]:     return _run_code(code, main_globals, None,
+[rank11]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank11]:     exec(code, run_globals)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank11]:     main()
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank11]:     trainer.train()
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank11]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank11]:     (result["loss"] / grad_accum_iters).backward()
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank11]:     torch.autograd.backward(
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank11]:     _engine_run_backward(
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank11]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank11]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank11]:     return disable_fn(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank11]:     return fn(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank11]:     return fn(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank11]:     fn(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank11]:     return self._call_impl(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank11]:     return inner()
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank11]:     result = forward_call(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank11]:     ff_output = self.ff(norm_hidden_states)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank11]:     return self._call_impl(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank11]:     return forward_call(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank11]:     hidden_states = module(hidden_states)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank11]:     return self._call_impl(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank11]:     return forward_call(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank11]:     hidden_states = self.proj(hidden_states)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank11]:     return self._call_impl(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank11]:     return forward_call(*args, **kwargs)
+[rank11]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank11]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank11]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 3 has a total capacity of 39.39 GiB of which 1.63 GiB is free. Process 63877 has 37.71 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.28 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank15]: Traceback (most recent call last):
+[rank15]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank15]:     return _run_code(code, main_globals, None,
+[rank15]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank15]:     exec(code, run_globals)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank15]:     main()
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank15]:     trainer.train()
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank15]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank15]:     (result["loss"] / grad_accum_iters).backward()
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank15]:     torch.autograd.backward(
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank15]:     _engine_run_backward(
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank15]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank15]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank15]:     return disable_fn(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank15]:     return fn(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank15]:     return fn(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank15]:     fn(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank15]:     return self._call_impl(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank15]:     return inner()
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank15]:     result = forward_call(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank15]:     ff_output = self.ff(norm_hidden_states)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank15]:     return self._call_impl(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank15]:     return forward_call(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank15]:     hidden_states = module(hidden_states)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank15]:     return self._call_impl(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank15]:     return forward_call(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank15]:     hidden_states = self.proj(hidden_states)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank15]:     return self._call_impl(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank15]:     return forward_call(*args, **kwargs)
+[rank15]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank15]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank15]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 7 has a total capacity of 39.39 GiB of which 1.67 GiB is free. Process 63881 has 37.66 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 111.29 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank14]: Traceback (most recent call last):
+[rank14]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+[rank14]:     return _run_code(code, main_globals, None,
+[rank14]:   File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+[rank14]:     exec(code, run_globals)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 72, in <module>
+[rank14]:     main()
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/entrypoint.py", line 63, in main
+[rank14]:     trainer.train()
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 59, in train
+[rank14]:     running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/src/h3_a100/trainer_loop.py", line 120, in _student_step
+[rank14]:     (result["loss"] / grad_accum_iters).backward()
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_tensor.py", line 630, in backward
+[rank14]:     torch.autograd.backward(
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/__init__.py", line 364, in backward
+[rank14]:     _engine_run_backward(
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+[rank14]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+[rank14]:     _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_compile.py", line 54, in inner
+[rank14]:     return disable_fn(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+[rank14]:     return fn(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+[rank14]:     return fn(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+[rank14]:     fn(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank14]:     return self._call_impl(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1882, in _call_impl
+[rank14]:     return inner()
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1830, in inner
+[rank14]:     result = forward_call(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/transformers/transformer_minimax_h3.py", line 370, in forward
+[rank14]:     ff_output = self.ff(norm_hidden_states)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank14]:     return self._call_impl(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank14]:     return forward_call(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/attention.py", line 1741, in forward
+[rank14]:     hidden_states = module(hidden_states)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank14]:     return self._call_impl(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank14]:     return forward_call(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/diffusers/models/activations.py", line 144, in forward
+[rank14]:     hidden_states = self.proj(hidden_states)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+[rank14]:     return self._call_impl(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+[rank14]:     return forward_call(*args, **kwargs)
+[rank14]:   File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/peft/tuners/lora/layer.py", line 807, in forward
+[rank14]:     result = result + lora_B(lora_A(dropout(x))) * scaling
+[rank14]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.02 GiB. GPU 6 has a total capacity of 39.39 GiB of which 1.67 GiB is free. Process 63880 has 37.66 GiB memory in use. Of the allocated memory 36.79 GiB is allocated by PyTorch, and 110.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+W0819 15:20:47.267000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412838 closing signal SIGTERM
+W0819 15:20:47.268000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412839 closing signal SIGTERM
+W0819 15:20:47.268000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412840 closing signal SIGTERM
+W0819 15:20:47.268000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412841 closing signal SIGTERM
+W0819 15:20:47.268000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412842 closing signal SIGTERM
+W0819 15:20:47.269000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412843 closing signal SIGTERM
+W0819 15:20:47.269000 412819 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 412845 closing signal SIGTERM
+E0819 15:20:48.989000 412819 torch/distributed/elastic/multiprocessing/api.py:984] failed (exitcode: 1) local_rank: 6 (pid: 412844) of binary: /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python
+Traceback (most recent call last):
+  File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/share/project/shuchenweng/DistillSchedule_envs/helios-official-torch210/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/run.py", line 995, in <module>
+    main()
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/run.py", line 991, in main
+    run(args)
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/run.py", line 982, in run
+    elastic_launch(
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/tmp/lyy-experiments/DMD-System/iteration_306_shared_backbone_boundary_policy_20260819/site-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+h3_a100.entrypoint FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 8 (local_rank: 0)
+  exitcode  : 1 (pid: 412838)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[2]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 9 (local_rank: 1)
+  exitcode  : 1 (pid: 412839)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[3]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 10 (local_rank: 2)
+  exitcode  : 1 (pid: 412840)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[4]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 11 (local_rank: 3)
+  exitcode  : 1 (pid: 412841)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[5]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 12 (local_rank: 4)
+  exitcode  : 1 (pid: 412842)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[6]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 13 (local_rank: 5)
+  exitcode  : 1 (pid: 412843)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+[7]:
+  time      : 2026-08-19_15:20:48
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 15 (local_rank: 7)
+  exitcode  : 1 (pid: 412845)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-08-19_15:20:47
+  host      : job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+  rank      : 14 (local_rank: 6)
+  exitcode  : 1 (pid: 412844)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

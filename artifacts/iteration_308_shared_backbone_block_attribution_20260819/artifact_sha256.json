@@ -1,0 +1,70 @@
+{
+  "run_id": "iteration_308_shared_backbone_block_attribution_20260819",
+  "files": [
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/logs/node0/output_train.log",
+      "sha256": "d6f1158391a6958b720b7a251d8aff4945f18da92d790e84b4bac1f5cd5961f3",
+      "bytes": 369704
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/logs/node0/train.log",
+      "sha256": "9e5325ff020b6a5f88129391751f7d1beec4b42a524f52ffdb8a3016c0630ee3",
+      "bytes": 446336
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/logs/node1/train.log",
+      "sha256": "9e95cd2313b8ab79233ac308480e2646db2f6fe2e9ba08b2956ae1c7f90f8f4b",
+      "bytes": 64964
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/manifest.json",
+      "sha256": "0f7a9675a645446ab6cbd96b6a1751247685b6319d7fe193685e26ffa71c2447",
+      "bytes": 896
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/meta/node0_command.txt",
+      "sha256": "0ac835db3b738d519bcf354c9149fb3f3a6698c358b105669a2e640018178277",
+      "bytes": 2433
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/meta/node0_preflight.txt",
+      "sha256": "4a659991072bed02c0ef9700e6170023b31367af924106458fdcf2dfa64be493",
+      "bytes": 153
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/meta/node1_command.txt",
+      "sha256": "58748888a70b64d146e912b4f76e1c4d34752dc15d9c3d87f4f0f19c848d9004",
+      "bytes": 2433
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/meta/node1_preflight.txt",
+      "sha256": "c02109214cdb180803cabd30c911940e8b9fdb16069b06e43dea45df64562d6b",
+      "bytes": 153
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.csv",
+      "sha256": "0dbe0a77dee192f13f960d6c86c684061288a9458fa81d19dded27caab8e803a",
+      "bytes": 254666
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.json",
+      "sha256": "5ed4a3b1fc6d96a37eb3ae7c6f492231ae71682715c84a31b0afe39086474bb9",
+      "bytes": 21021
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.md",
+      "sha256": "8c7172a409a86989a59f98db90eae2bccde986cbc4ff29c428321f5af988eba7",
+      "bytes": 5622
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/reports/residency_block_attribution.png",
+      "sha256": "2e427e76f943bd1dff6cd1855556cc0b8fac8669d66a7d3c680ae12180412b04",
+      "bytes": 122969
+    },
+    {
+      "path": "artifacts/iteration_308_shared_backbone_block_attribution_20260819/research_log.md",
+      "sha256": "095b2fb723e68ae10a19824311a81c69963337d8f062e029c9716a50b399ad40",
+      "bytes": 851
+    }
+  ]
+}
