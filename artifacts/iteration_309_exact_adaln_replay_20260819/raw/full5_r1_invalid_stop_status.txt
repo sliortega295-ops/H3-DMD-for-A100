@@ -1,0 +1,40 @@
+stop_time=2026-08-20T05:17:47+00:00
+host=job-a248b179-3c88-49c3-ad58-74597d6f9133-master-0
+BEFORE
+ 423824       1 S       35:27 bash /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_full5_r1_20260820/launch_node1.sh
+ 423834  423824 S       35:27 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -m torch.distributed.run --nnodes=2 --nproc_per_node=8 --node_rank=1 --master_addr=172.24.211.148 --master_port=29634 -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423853  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423854  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423855  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423856  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423857  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423858  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423859  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 423860  423834 S       35:10 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426443  423858 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426444  423854 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426445  423855 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426446  423860 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426447  423853 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426448  423859 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426449  423857 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426450  423856 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426451  423858 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426455  423854 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426458  423855 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426463  423860 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426467  423853 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426469  423859 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426473  423857 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+ 426477  423856 S       14:20 /share/project/shuchenweng/yongyan_liu/DMD-System_assets/lightx2v_minimax_dmd_20260817/env/bin/python -u -m h3_a100.entrypoint --config /tmp/lyy-experiments/DMD-System/iteration_309_exact_adaln_replay_20260819/src_exact/configs/minimax_h3_t2av_dmd_a100_world16.yaml
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+AFTER
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0

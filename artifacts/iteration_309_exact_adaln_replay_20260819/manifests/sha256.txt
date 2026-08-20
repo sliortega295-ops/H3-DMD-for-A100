@@ -1,0 +1,7 @@
+f87a224f7bfdbdaacdf729cc8fe4195bd1fde90411c1caf31aca6483977d68bf  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/iteration_309_exact_adaln_replay_20260819/raw/full5_r1_invalid_stop_status.txt
+0eb6645e3742591dee669b94f59c0946c5513b5f612f7866ad28d388da01ab70  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/iteration_309_exact_adaln_replay_20260819/raw/node0_timing.log
+071f92102c2c5c561739f59c507906ede2bb8b73567b61d6df5374f12a9836e3  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/iteration_309_exact_adaln_replay_20260819/raw/node1_timing.log
+b24ed0ae89a19ea545d89334e7f001ac311c15f2abb2969c1e45ccaf303e1315  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/iteration_309_exact_adaln_replay_20260819/reports/one_cycle_timing.md
+6558efefab52b72532c03740d6a02de3ce3f537d4e816c7d11a28a247c4d65c9  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/iteration_309_exact_adaln_replay_20260819/manifests/one_cycle_manifest.json
+b24ed0ae89a19ea545d89334e7f001ac311c15f2abb2969c1e45ccaf303e1315  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/docs/experiments/H3_DMD_A100_EXACT_REPLAY.md
+6558efefab52b72532c03740d6a02de3ce3f537d4e816c7d11a28a247c4d65c9  /home/lyy/Helios/H3-DMD-for-A100/worktrees/exact-adaln/artifacts/h3_dmd_a100_exact_replay.json
