@@ -57,6 +57,7 @@ class H3A100LoopMixin:
                 self.matched_cycle_census.reset()
             self._begin_boundary_offload_cycle()
             self._begin_fused_pointwise_cycle()
+            runtime_state_start = self.shared_model.runtime_state_stats()
             with self._nvtx("h3/student_step"):
                 running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
             with self._nvtx("h3/critic_phase"):
@@ -65,6 +66,24 @@ class H3A100LoopMixin:
                 self._validate_matched_cycle(current_iter)
             self._validate_boundary_offload_cycle(current_iter)
             self._validate_fused_pointwise_cycle(current_iter)
+            runtime_state_end = self.shared_model.runtime_state_stats()
+            logger.info(
+                "[h3-a100][runtime-state] iter={} rank={} delta={} final_role={} "
+                "final_training={}",
+                current_iter,
+                get_rank(),
+                {
+                    key: int(runtime_state_end[key]) - int(runtime_state_start[key])
+                    for key in (
+                        "role_transitions",
+                        "role_noops",
+                        "mode_transitions",
+                        "mode_noops",
+                    )
+                },
+                runtime_state_end["physical_role"],
+                runtime_state_end["physical_training_mode"],
+            )
 
             current_iter += 1
             display_dmd = reduce_mean(running_dmd)
@@ -113,7 +132,7 @@ class H3A100LoopMixin:
                     # production checkpoint-boundary policy is installed at
                     # the transformer's native checkpoint function instead.
                     offload.begin_backward()
-                self.shared_model.transformer.train()
+                self.shared_model.set_transformer_training(True)
                 with self.shared_model.role_scope(STUDENT_ADAPTER), self.shared_model.adaln_scope(
                     result["backward_key"], persistent=True
                 ):
@@ -178,21 +197,25 @@ class H3A100LoopMixin:
         fake_loss_value = 0.0
         for micro_idx, item in enumerate(group):
             self._set_shared_gradient_sync(micro_idx == len(group) - 1)
-            with self._activation_offload_scope(f"fake_{micro_idx}") as offload:
-                self._log_residency(f"before_fake_{micro_idx}_grad_forward")
-                loss_fake = self.fake_loss(item)
-                self._log_residency(f"after_fake_{micro_idx}_grad_forward")
-                if offload is not None:
-                    offload.begin_backward()
-                self.shared_model.transformer.train()
-                with self.shared_model.role_scope(FAKE_ADAPTER), self.shared_model.adaln_scope(
-                    item.cache_key, persistent=False
-                ):
-                    if self.matched_compute_enabled:
-                        self.matched_cycle_census.note_backward(FAKE_ROLE)
-                    self._log_residency(f"before_fake_{micro_idx}_backward")
-                    (loss_fake / len(group)).backward()
-                    self._log_residency(f"after_fake_{micro_idx}_backward")
+            # Keep the Fake adapter physically active from its grad forward
+            # through checkpoint replay.  Nested role scopes remain intact but
+            # become idempotent through the physical-state cache above.
+            with self.shared_model.role_scope(FAKE_ADAPTER):
+                with self._activation_offload_scope(f"fake_{micro_idx}") as offload:
+                    self._log_residency(f"before_fake_{micro_idx}_grad_forward")
+                    loss_fake = self.fake_loss(item)
+                    self._log_residency(f"after_fake_{micro_idx}_grad_forward")
+                    if offload is not None:
+                        offload.begin_backward()
+                    self.shared_model.set_transformer_training(True)
+                    with self.shared_model.role_scope(FAKE_ADAPTER), self.shared_model.adaln_scope(
+                        item.cache_key, persistent=False
+                    ):
+                        if self.matched_compute_enabled:
+                            self.matched_cycle_census.note_backward(FAKE_ROLE)
+                        self._log_residency(f"before_fake_{micro_idx}_backward")
+                        (loss_fake / len(group)).backward()
+                        self._log_residency(f"after_fake_{micro_idx}_backward")
             if offload is not None:
                 logger.info(
                     "[h3-a100][activation-offload] component=fake_{} stats={}",

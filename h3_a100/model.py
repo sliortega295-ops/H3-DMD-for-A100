@@ -160,6 +160,20 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         self._role: contextvars.ContextVar[str] = contextvars.ContextVar(
             "h3_a100_role", default=STUDENT_ADAPTER
         )
+        # PEFT adapter changes and ``Module.train()`` both recurse through the
+        # full 50-block H3 tree.  The workload enters many logically nested
+        # scopes whose requested state is already active, so keep an explicit
+        # physical-state cache and make those transitions idempotent.  This is
+        # host-side bookkeeping only; every real role/mode change still calls
+        # the pinned Diffusers/PEFT APIs.
+        self._physical_role: str | None = None
+        self._physical_training_mode: bool | None = None
+        self._runtime_state_stats = {
+            "role_transitions": 0,
+            "role_noops": 0,
+            "mode_transitions": 0,
+            "mode_noops": 0,
+        }
         self._shared_backbone_ready = False
 
     def load_components(self, transformer_only=False, reference_model=None):
@@ -290,11 +304,16 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         return parameters
 
     def _activate_role(self, role: str) -> None:
+        if role == self._physical_role:
+            self._runtime_state_stats["role_noops"] += 1
+            return
         transformer = self.denoiser_module()
         if role == BASE_ROLE:
             if not hasattr(transformer, "disable_adapters"):
                 raise RuntimeError("Diffusers H3 cannot disable adapters for the teacher role")
             transformer.disable_adapters()
+            self._physical_role = role
+            self._runtime_state_stats["role_transitions"] += 1
             return
         if role not in {STUDENT_ADAPTER, FAKE_ADAPTER}:
             raise ValueError(f"Unknown H3 shared-backbone role: {role!r}")
@@ -308,6 +327,32 @@ class MiniMaxH3A100Model(MiniMaxH3T2AVModel):
         # and let the active adapter determine which one participates in the
         # forward graph.
         self._mark_all_adapters_trainable()
+        self._physical_role = role
+        self._runtime_state_stats["role_transitions"] += 1
+
+    def set_transformer_training(self, training: bool) -> None:
+        """Apply a full-module train/eval transition only when it changes.
+
+        MiniMax-H3 has no stochastic dropout under the controlled workload,
+        but its train/eval state remains part of the frozen contract.  This
+        helper preserves that state exactly while avoiding repeated recursive
+        walks requested by adjacent rollout or Fake-update calls.
+        """
+
+        training = bool(training)
+        if training == self._physical_training_mode:
+            self._runtime_state_stats["mode_noops"] += 1
+            return
+        self.denoiser_module().train(training)
+        self._physical_training_mode = training
+        self._runtime_state_stats["mode_transitions"] += 1
+
+    def runtime_state_stats(self) -> dict[str, int | str | bool | None]:
+        return {
+            **self._runtime_state_stats,
+            "physical_role": self._physical_role,
+            "physical_training_mode": self._physical_training_mode,
+        }
 
     def _mark_all_adapters_trainable(self) -> dict[str, int]:
         transformer = self.denoiser_module()

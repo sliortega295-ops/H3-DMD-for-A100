@@ -80,7 +80,7 @@ class H3A100RuntimeMixin:
     def run_back_simulation(self, condition, latent_shape, end_step_idx, grad_enabled, xt=None):
         if xt is None:
             xt = self.sample_initial_latents(latent_shape)
-        self.shared_model.transformer.train()
+        self.shared_model.set_transformer_training(True)
         x0 = None
         backward_key = None
         for step_idx in range(end_step_idx + 1):
@@ -135,7 +135,7 @@ class H3A100RuntimeMixin:
         score_key = self._next_score_key()
         timesteps = self._adaln_timesteps(condition, latent_shape, sigmas)
         self.shared_model.precompute_adaln(score_key, timesteps, persistent=False)
-        self.shared_model.transformer.eval()
+        self.shared_model.set_transformer_training(False)
         with torch.no_grad(), self.shared_model.adaln_scope(score_key, persistent=False):
             velocity_fake = self._predict_velocity_role(
                 FAKE_ADAPTER, renoised, sigmas, condition, latent_shape
@@ -190,7 +190,7 @@ class H3A100RuntimeMixin:
     def fake_loss(self, item: PreparedFakeUpdate):
         timesteps = self._adaln_timesteps(item.condition, item.latent_shape, item.sigmas)
         self.shared_model.precompute_adaln(item.cache_key, timesteps, persistent=False)
-        self.shared_model.transformer.train()
+        self.shared_model.set_transformer_training(True)
         with self.shared_model.adaln_scope(item.cache_key, persistent=False):
             velocity_fake = self._predict_velocity_role(
                 FAKE_ADAPTER,
