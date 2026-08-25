@@ -73,6 +73,11 @@ def _patched_forward(
             rotary_emb,
             attention_mask,
         )
+    if grad_enabled:
+        # Non-reentrant checkpoint replay may terminate a recomputed block via
+        # PyTorch's internal early-stop exception before normal return.  Count
+        # entry, not return, exactly like the Grid replay scope audit.
+        stats.fused_grad_block_calls += 1
 
     # Lazy import keeps the baseline/import-only path independent of Triton.
     from .triton_fused_pointwise import fused_modulate, fused_residual
@@ -119,9 +124,7 @@ def _patched_forward(
     hidden_states = residual_update(residual, gate_mlp, ff_output, adaln_indices)
     if not grad_enabled:
         stats.fused_residual_calls += 1
-    if grad_enabled:
-        stats.fused_grad_block_calls += 1
-    else:
+    if not grad_enabled:
         stats.fused_nograd_block_calls += 1
     return hidden_states
 

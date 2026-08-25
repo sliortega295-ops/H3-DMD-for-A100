@@ -7,6 +7,7 @@ import copy
 import json
 
 import torch
+from torch.utils.checkpoint import checkpoint
 from diffusers.models.transformers.transformer_minimax_h3 import MiniMaxH3TransformerBlock
 
 from h3_a100.fused_block_pointwise import install_fused_block_pointwise
@@ -89,6 +90,47 @@ def main():
     if not torch.equal(reference_input.grad, candidate_input.grad):
         raise RuntimeError("grad-enabled patched block gradient changed")
 
+    # Validate entry accounting under the real non-reentrant checkpoint
+    # mechanism.  Replay is allowed to early-stop before the Python block
+    # wrapper returns, so one logical checkpointed block must count two entries
+    # but only one set of pointwise backward calls.
+    checkpoint_reference = hidden.detach().clone().requires_grad_(True)
+    checkpoint_candidate = hidden.detach().clone().requires_grad_(True)
+    before = registration.snapshot()
+    expected_checkpoint = checkpoint(
+        lambda value: reference(value, temb, indices, None),
+        checkpoint_reference,
+        use_reentrant=False,
+    )
+    observed_checkpoint = checkpoint(
+        lambda value: transformer.transformer_blocks[0](value, temb, indices, None),
+        checkpoint_candidate,
+        use_reentrant=False,
+    )
+    checkpoint_upstream = torch.randn_like(expected_checkpoint)
+    expected_checkpoint.backward(checkpoint_upstream)
+    observed_checkpoint.backward(checkpoint_upstream)
+    if not torch.equal(expected_checkpoint, observed_checkpoint):
+        raise RuntimeError("checkpointed fused block output changed")
+    if not torch.equal(checkpoint_reference.grad, checkpoint_candidate.grad):
+        raise RuntimeError("checkpointed fused block gradient changed")
+    after = registration.snapshot()
+    checkpoint_delta = {key: int(after[key]) - int(before[key]) for key in after}
+    expected_delta = {
+        "fused_grad_block_calls": 2,
+        "fused_grad_modulation_calls": 4,
+        "fused_grad_residual_calls": 4,
+        "fused_grad_modulation_backward_calls": 2,
+        "fused_grad_residual_backward_calls": 2,
+    }
+    errors = [
+        f"{key}={checkpoint_delta[key]} expected={value}"
+        for key, value in expected_delta.items()
+        if checkpoint_delta[key] != value
+    ]
+    if errors:
+        raise RuntimeError("checkpoint pointwise accounting failed: " + "; ".join(errors))
+
     print(
         json.dumps(
             {
@@ -98,6 +140,9 @@ def main():
                 "no_grad_output_bitwise_equal": True,
                 "grad_output_bitwise_equal": True,
                 "grad_input_bitwise_equal": True,
+                "checkpoint_output_bitwise_equal": True,
+                "checkpoint_grad_input_bitwise_equal": True,
+                "checkpoint_delta": checkpoint_delta,
                 "stats": registration.snapshot(),
             },
             indent=2,
