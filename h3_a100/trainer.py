@@ -20,6 +20,7 @@ from .checkpoint_boundary_offload import (
 )
 from .checkpointing import H3A100CheckpointMixin
 from .fused_block_pointwise import install_fused_block_pointwise
+from .fused_rotary import install_fused_rotary
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -52,6 +53,7 @@ class MiniMaxH3A100DmdTrainer(
         checkpointing = a100.get("activation_checkpointing", {})
         activation_policy = a100.get("activation_policy", {})
         pointwise_fusion = a100.get("block_pointwise_fusion", {})
+        rotary_fusion = a100.get("rotary_fusion", {})
 
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
@@ -120,6 +122,16 @@ class MiniMaxH3A100DmdTrainer(
             else bool(fusion_value)
         )
         self.fused_block_pointwise_registration = None
+        rotary_value = os.environ.get(
+            "H3_FUSED_ROTARY",
+            rotary_fusion.get("enabled", False),
+        )
+        self.fused_rotary_enabled = (
+            rotary_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(rotary_value, str)
+            else bool(rotary_value)
+        )
+        self.fused_rotary_registration = None
 
         self.activation_offload_enabled = os.environ.get(
             "H3_ACTIVATION_OFFLOAD", "0"
@@ -185,6 +197,7 @@ class MiniMaxH3A100DmdTrainer(
             model.denoiser_module(),
             enabled=self.fused_block_pointwise_enabled,
         )
+        self.fused_rotary_registration = install_fused_rotary(enabled=self.fused_rotary_enabled)
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)

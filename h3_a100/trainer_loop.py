@@ -25,6 +25,7 @@ from lightx2v_train.runtime.sequence_parallel import sync_sequence_parallel_grad
 from .matched_contract import FAKE_ROLE, STUDENT_ROLE, validate_global_snapshots
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER
 from .fused_block_pointwise import validate_cycle as validate_fused_pointwise_cycle
+from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -57,6 +58,7 @@ class H3A100LoopMixin:
                 self.matched_cycle_census.reset()
             self._begin_boundary_offload_cycle()
             self._begin_fused_pointwise_cycle()
+            self._begin_fused_rotary_cycle()
             runtime_state_start = self.shared_model.runtime_state_stats()
             with self._nvtx("h3/student_step"):
                 running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
@@ -66,6 +68,7 @@ class H3A100LoopMixin:
                 self._validate_matched_cycle(current_iter)
             self._validate_boundary_offload_cycle(current_iter)
             self._validate_fused_pointwise_cycle(current_iter)
+            self._validate_fused_rotary_cycle(current_iter)
             runtime_state_end = self.shared_model.runtime_state_stats()
             logger.info(
                 "[h3-a100][runtime-state] iter={} rank={} delta={} final_role={} "
@@ -260,6 +263,12 @@ class H3A100LoopMixin:
             None if registration is None or not registration.enabled else registration.snapshot()
         )
 
+    def _begin_fused_rotary_cycle(self) -> None:
+        registration = getattr(self, "fused_rotary_registration", None)
+        self._fused_rotary_cycle_start = (
+            None if registration is None or not registration.enabled else registration.snapshot()
+        )
+
     def _validate_fused_pointwise_cycle(self, current_iter: int) -> None:
         registration = getattr(self, "fused_block_pointwise_registration", None)
         if registration is None or not registration.enabled:
@@ -270,6 +279,22 @@ class H3A100LoopMixin:
         delta = validate_fused_pointwise_cycle(registration, start)
         logger.info(
             "[h3-a100][fused-pointwise] iter={} rank={} source_sha={} delta={}",
+            current_iter,
+            get_rank(),
+            registration.source_sha256,
+            delta,
+        )
+
+    def _validate_fused_rotary_cycle(self, current_iter: int) -> None:
+        registration = getattr(self, "fused_rotary_registration", None)
+        if registration is None or not registration.enabled:
+            return
+        start = self._fused_rotary_cycle_start
+        if start is None:
+            raise RuntimeError("H3 fused rotary cycle baseline is missing")
+        delta = validate_fused_rotary_cycle(registration, start)
+        logger.info(
+            "[h3-a100][fused-rotary] iter={} rank={} source_sha={} delta={}",
             current_iter,
             get_rank(),
             registration.source_sha256,

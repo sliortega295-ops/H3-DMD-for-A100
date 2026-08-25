@@ -93,6 +93,10 @@ training:
       # Opt-in candidate. Baseline remains byte-for-byte on the upstream block
       # forward unless H3_FUSED_BLOCK_POINTWISE=1 is explicitly exported.
       enabled: false
+    rotary_fusion:
+      # Opt-in no-grad-only kernel. Grad forward and checkpoint replay remain
+      # on the pinned Diffusers implementation.
+      enabled: false
     critic_rollout_reorder:
       enabled: true
       group_size: 5
