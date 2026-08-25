@@ -94,9 +94,10 @@ training:
       # forward unless H3_FUSED_BLOCK_POINTWISE=1 is explicitly exported.
       enabled: false
     rotary_fusion:
-      # Opt-in no-grad-only kernel. Grad forward and checkpoint replay remain
-      # on the pinned Diffusers implementation.
+      # Both switches are opt-in. The base switch fuses no-grad calls; the
+      # independent grad switch adds exact custom-autograd forward/backward.
       enabled: false
+      grad_enabled: false
     critic_rollout_reorder:
       enabled: true
       group_size: 5

@@ -131,6 +131,17 @@ class MiniMaxH3A100DmdTrainer(
             if isinstance(rotary_value, str)
             else bool(rotary_value)
         )
+        rotary_grad_value = os.environ.get(
+            "H3_FUSED_ROTARY_GRAD",
+            rotary_fusion.get("grad_enabled", False),
+        )
+        self.fused_rotary_grad_enabled = (
+            rotary_grad_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(rotary_grad_value, str)
+            else bool(rotary_grad_value)
+        )
+        if self.fused_rotary_grad_enabled and not self.fused_rotary_enabled:
+            raise ValueError("H3_FUSED_ROTARY_GRAD requires H3_FUSED_ROTARY=1")
         self.fused_rotary_registration = None
 
         self.activation_offload_enabled = os.environ.get(
@@ -197,7 +208,10 @@ class MiniMaxH3A100DmdTrainer(
             model.denoiser_module(),
             enabled=self.fused_block_pointwise_enabled,
         )
-        self.fused_rotary_registration = install_fused_rotary(enabled=self.fused_rotary_enabled)
+        self.fused_rotary_registration = install_fused_rotary(
+            enabled=self.fused_rotary_enabled,
+            grad_enabled=self.fused_rotary_grad_enabled,
+        )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)

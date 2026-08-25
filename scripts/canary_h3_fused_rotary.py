@@ -8,9 +8,13 @@ import json
 import time
 
 import torch
+from torch.utils.checkpoint import checkpoint
 
 from h3_a100.fused_rotary import install_fused_rotary
-from h3_a100.triton_fused_rotary import fused_apply_rotary_emb
+from h3_a100.triton_fused_rotary import (
+    fused_apply_rotary_emb,
+    fused_apply_rotary_emb_backward,
+)
 
 
 def _time_cuda(function, warmup: int, iterations: int) -> float:
@@ -32,6 +36,7 @@ def main() -> None:
     parser.add_argument("--rotary-dim", type=int, default=96)
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--iterations", type=int, default=10)
+    parser.add_argument("--fuse-grad", action="store_true")
     args = parser.parse_args()
 
     import diffusers.models.transformers.transformer_minimax_h3 as module
@@ -57,7 +62,7 @@ def main() -> None:
             f"max_abs={difference.max().item()} mismatched={(expected != observed).sum().item()}"
         )
 
-    registration = install_fused_rotary(enabled=True)
+    registration = install_fused_rotary(enabled=True, grad_enabled=args.fuse_grad)
     with torch.no_grad():
         wrapped = module._apply_rotary_emb(hidden, cos, sin)
     if not torch.equal(expected, wrapped):
@@ -68,10 +73,40 @@ def main() -> None:
     reference_output = original(reference_input, cos, sin)
     if not torch.equal(grad_output, reference_output):
         raise RuntimeError("installed grad rotary wrapper changed output")
-    grad_output.float().sum().backward()
-    reference_output.float().sum().backward()
+    upstream = torch.randn_like(grad_output)
+    grad_output.backward(upstream)
+    reference_output.backward(upstream)
     if not torch.equal(grad_input.grad, reference_input.grad):
         raise RuntimeError("installed grad rotary wrapper changed input gradient")
+
+    direct_backward = fused_apply_rotary_emb_backward(upstream, cos, sin)
+    if not torch.equal(direct_backward, reference_input.grad):
+        difference = (direct_backward.float() - reference_input.grad.float()).abs()
+        raise RuntimeError(
+            "fused rotary backward is not bitwise equal: "
+            f"max_abs={difference.max().item()} mismatched="
+            f"{(direct_backward != reference_input.grad).sum().item()}"
+        )
+
+    checkpoint_reference_input = hidden.detach().clone().requires_grad_(True)
+    checkpoint_fused_input = hidden.detach().clone().requires_grad_(True)
+    checkpoint_reference_output = checkpoint(
+        lambda value: original(value, cos, sin),
+        checkpoint_reference_input,
+        use_reentrant=False,
+    )
+    checkpoint_fused_output = checkpoint(
+        lambda value: module._apply_rotary_emb(value, cos, sin),
+        checkpoint_fused_input,
+        use_reentrant=False,
+    )
+    if not torch.equal(checkpoint_reference_output, checkpoint_fused_output):
+        raise RuntimeError("non-reentrant checkpoint fused rotary changed output")
+    checkpoint_upstream = torch.randn_like(checkpoint_fused_output)
+    checkpoint_fused_output.backward(checkpoint_upstream)
+    checkpoint_reference_output.backward(checkpoint_upstream)
+    if not torch.equal(checkpoint_fused_input.grad, checkpoint_reference_input.grad):
+        raise RuntimeError("non-reentrant checkpoint fused rotary changed input gradient")
 
     with torch.no_grad():
         reference_ms = _time_cuda(lambda: original(hidden, cos, sin), args.warmup, args.iterations)
@@ -89,6 +124,9 @@ def main() -> None:
                 "output_bitwise_equal": True,
                 "grad_output_bitwise_equal": True,
                 "grad_input_bitwise_equal": True,
+                "direct_backward_bitwise_equal": True,
+                "checkpoint_output_bitwise_equal": True,
+                "checkpoint_grad_bitwise_equal": True,
                 "reference_ms": reference_ms,
                 "fused_ms": fused_ms,
                 "speedup": reference_ms / fused_ms,

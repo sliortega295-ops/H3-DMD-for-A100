@@ -1,11 +1,10 @@
-"""Exact BF16 rotary fusion for MiniMax-H3 no-grad attention.
+"""Exact BF16 rotary fusion for MiniMax-H3 attention.
 
 The pinned Diffusers implementation materializes a rotate-half tensor, two
 BF16 products, their BF16 sum, and a final concatenation for every Q/K pair.
 This kernel preserves those BF16 rounding boundaries while writing the final
-``[rotary, pass-through]`` tensor directly.  It intentionally has no autograd
-implementation; gradient-bearing forward and checkpoint replay remain on the
-pinned upstream function.
+``[rotary, pass-through]`` tensor directly.  The optional backward kernel keeps
+the same BF16 multiply/add rounding boundaries used by eager autograd.
 """
 
 from __future__ import annotations
@@ -97,6 +96,50 @@ def _rotary_kernel(
     tl.store(output + offsets, result, mask=valid)
 
 
+@triton.jit
+def _rotary_backward_kernel(
+    grad_output,
+    cosine,
+    sine,
+    grad_input,
+    n_elements,
+    num_heads: tl.constexpr,
+    head_dim: tl.constexpr,
+    rotary_dim: tl.constexpr,
+    block_size: tl.constexpr,
+):
+    offsets = tl.program_id(0) * block_size + tl.arange(0, block_size)
+    valid = offsets < n_elements
+    head_columns = offsets % head_dim
+    rotary_mask = valid & (head_columns < rotary_dim)
+
+    rows = offsets // head_dim
+    sequence_rows = rows // num_heads
+    half = rotary_dim // 2
+    paired_columns = tl.where(head_columns < half, head_columns + half, head_columns - half)
+    paired_offsets = tl.where(head_columns < half, offsets + half, offsets - half)
+
+    direct_grad = tl.load(grad_output + offsets, mask=valid, other=0.0).to(tl.bfloat16)
+    paired_grad = tl.load(grad_output + paired_offsets, mask=rotary_mask, other=0.0).to(
+        tl.bfloat16
+    )
+    direct_table = sequence_rows * rotary_dim + head_columns
+    paired_table = sequence_rows * rotary_dim + paired_columns
+    cos_values = tl.load(cosine + direct_table, mask=rotary_mask, other=0.0).to(tl.bfloat16)
+    sin_values = tl.load(sine + paired_table, mask=rotary_mask, other=0.0).to(tl.bfloat16)
+    signed_paired_grad = tl.where(head_columns < half, paired_grad, -paired_grad).to(
+        tl.bfloat16
+    )
+    rotary_grad = _bf16_rotary_exact(
+        direct_grad,
+        signed_paired_grad,
+        cos_values,
+        sin_values,
+    )
+    result = tl.where(rotary_mask, rotary_grad, direct_grad)
+    tl.store(grad_input + offsets, result, mask=valid)
+
+
 def fused_apply_rotary_emb(
     hidden_states: torch.Tensor,
     cos: torch.Tensor,
@@ -152,3 +195,62 @@ def fused_apply_rotary_emb(
         num_warps=8,
     )
     return output
+
+
+def fused_apply_rotary_emb_backward(
+    grad_output: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor,
+) -> torch.Tensor:
+    """Return the exact hidden-state gradient for :func:`fused_apply_rotary_emb`."""
+
+    # Reuse the forward contract checks without allocating a forward output.
+    if not grad_output.is_cuda or not cos.is_cuda or not sin.is_cuda:
+        raise RuntimeError("H3 fused rotary backward requires CUDA tensors")
+    if grad_output.dtype != torch.bfloat16 or grad_output.ndim != 4:
+        raise RuntimeError(
+            "H3 fused rotary backward requires BF16 grad_output=[B,S,NH,HD]"
+        )
+    if cos.shape != sin.shape or cos.device != grad_output.device or sin.device != grad_output.device:
+        raise RuntimeError("H3 fused rotary backward cos/sin shape or device mismatch")
+    batch, sequence_length, num_heads, head_dim = map(int, grad_output.shape)
+    if batch != 1:
+        raise RuntimeError(
+            f"H3 fused rotary backward is registered only for B1, got B={batch}"
+        )
+    rotary_dim = int(cos.shape[1])
+    if int(cos.shape[0]) != sequence_length:
+        raise RuntimeError(
+            f"H3 fused rotary backward sequence mismatch grad={sequence_length} cos={cos.shape[0]}"
+        )
+    if rotary_dim <= 0 or rotary_dim > head_dim or rotary_dim % 2:
+        raise RuntimeError(
+            f"H3 fused rotary backward requires even 0 < rotary_dim <= head_dim, got {rotary_dim}/{head_dim}"
+        )
+    if cos.dtype not in {torch.float32, torch.bfloat16} or sin.dtype != cos.dtype:
+        raise RuntimeError(
+            f"H3 fused rotary backward requires matching FP32/BF16 cos/sin, got {cos.dtype}/{sin.dtype}"
+        )
+    if not grad_output.is_contiguous() or not cos.is_contiguous() or not sin.is_contiguous():
+        raise RuntimeError("H3 fused rotary backward requires contiguous grad/cos/sin")
+    n_elements = batch * sequence_length * num_heads * head_dim
+    if n_elements % 2:
+        raise RuntimeError(
+            f"H3 fused rotary backward BF16 pack=2 requires even element count, got {n_elements}"
+        )
+
+    grad_input = torch.empty_like(grad_output)
+    block_size = 1024
+    _rotary_backward_kernel[(triton.cdiv(n_elements, block_size),)](
+        grad_output,
+        cos,
+        sin,
+        grad_input,
+        n_elements=n_elements,
+        num_heads=num_heads,
+        head_dim=head_dim,
+        rotary_dim=rotary_dim,
+        block_size=block_size,
+        num_warps=8,
+    )
+    return grad_input
