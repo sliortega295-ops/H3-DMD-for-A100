@@ -86,8 +86,11 @@ class H3A100LoopMixin:
             )
 
             current_iter += 1
-            display_dmd = reduce_mean(running_dmd)
-            display_fake = reduce_mean(running_fake)
+            # Scalar logging is outside the model-compute/timing range.  Keep
+            # detached device scalars asynchronous through Student1+Fake5 and
+            # perform the first host read only after all correctness receipts.
+            display_dmd = reduce_mean(self._mean_detached_metrics(running_dmd))
+            display_fake = reduce_mean(self._mean_detached_metrics(running_fake))
             if current_iter == 1 or current_iter % self.train_log_every_iters == 0:
                 logger.info(
                     "[h3-a100] iter={}/{} dmd={:.6f} fake={:.6f} lr={:.8f}",
@@ -113,9 +116,19 @@ class H3A100LoopMixin:
 
         logger.info("[h3-a100] train finished iter={}/{}", current_iter, self.max_train_iters)
 
-    def _student_step(self, samples: Iterator, grad_accum_iters: int, current_iter: int) -> float:
+    @staticmethod
+    def _mean_detached_metrics(values: list[torch.Tensor]) -> torch.Tensor:
+        if not values:
+            raise RuntimeError("H3 metric collection produced no values")
+        if len(values) == 1:
+            return values[0]
+        return torch.stack(values).mean()
+
+    def _student_step(
+        self, samples: Iterator, grad_accum_iters: int, current_iter: int
+    ) -> list[torch.Tensor]:
         self.optimizer.zero_grad(set_to_none=True)
-        running_dmd = 0.0
+        dmd_metrics: list[torch.Tensor] = []
         for micro_idx in range(grad_accum_iters):
             sample = next(samples)
             if self.matched_compute_enabled:
@@ -146,7 +159,7 @@ class H3A100LoopMixin:
                     "[h3-a100][activation-offload] component=student stats={}",
                     offload.stats,
                 )
-            running_dmd += result["dmd"].item() / grad_accum_iters
+            dmd_metrics.append(result["dmd"].detach())
 
         sync_sequence_parallel_gradients(self.trainable_params)
         torch.nn.utils.clip_grad_norm_(self.trainable_params, self.max_grad_norm)
@@ -155,10 +168,10 @@ class H3A100LoopMixin:
         self.lr_scheduler.step()
         self._log_residency("after_student_optimizer")
         self.optimizer.zero_grad(set_to_none=True)
-        return running_dmd
+        return dmd_metrics
 
-    def _fake_steps(self, samples: Iterator, grad_accum_iters: int) -> float:
-        running_fake = 0.0
+    def _fake_steps(self, samples: Iterator, grad_accum_iters: int) -> list[torch.Tensor]:
+        fake_metrics: list[torch.Tensor] = []
         if self.reorder_critic_rollouts:
             with self._nvtx("h3/critic_prepare_5xG"):
                 groups = [
@@ -167,13 +180,13 @@ class H3A100LoopMixin:
                 ]
             for group in groups:
                 with self._nvtx("h3/critic_update_F"):
-                    running_fake += self._apply_one_fake_group(group) / self.fake_update_ratio
-            return running_fake
+                    fake_metrics.extend(self._apply_one_fake_group(group))
+            return fake_metrics
 
         for fake_index in range(self.fake_update_ratio):
             group = self._prepare_one_fake_group(samples, grad_accum_iters, fake_index)
-            running_fake += self._apply_one_fake_group(group) / self.fake_update_ratio
-        return running_fake
+            fake_metrics.extend(self._apply_one_fake_group(group))
+        return fake_metrics
 
     def _prepare_one_fake_group(
         self,
@@ -192,9 +205,9 @@ class H3A100LoopMixin:
             self._log_residency(f"after_fake_{fake_index}_rollout_prepare")
         return group
 
-    def _apply_one_fake_group(self, group: list[PreparedFakeUpdate]) -> float:
+    def _apply_one_fake_group(self, group: list[PreparedFakeUpdate]) -> list[torch.Tensor]:
         self.fake_optimizer.zero_grad(set_to_none=True)
-        fake_loss_value = 0.0
+        fake_loss_metrics: list[torch.Tensor] = []
         for micro_idx, item in enumerate(group):
             self._set_shared_gradient_sync(micro_idx == len(group) - 1)
             # Keep the Fake adapter physically active from its grad forward
@@ -223,7 +236,7 @@ class H3A100LoopMixin:
                     offload.stats,
                 )
             self.shared_model.drop_adaln_key(item.cache_key)
-            fake_loss_value += loss_fake.item() / len(group)
+            fake_loss_metrics.append(loss_fake.detach())
 
         sync_sequence_parallel_gradients(self.fake_trainable_params)
         torch.nn.utils.clip_grad_norm_(self.fake_trainable_params, self.max_grad_norm)
@@ -232,7 +245,7 @@ class H3A100LoopMixin:
         self.fake_lr_scheduler.step()
         self._log_residency("after_fake_optimizer")
         self.fake_optimizer.zero_grad(set_to_none=True)
-        return fake_loss_value
+        return fake_loss_metrics
 
     def _begin_boundary_offload_cycle(self) -> None:
         registration = getattr(self, "boundary_offload_registration", None)
