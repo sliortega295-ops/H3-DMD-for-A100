@@ -89,6 +89,10 @@ training:
       grid_size: 1000
       manifest: ${oc.env:H3_ADALN_GRID_MANIFEST,}
       pin_memory: true
+    block_pointwise_fusion:
+      # Opt-in candidate. Baseline remains byte-for-byte on the upstream block
+      # forward unless H3_FUSED_BLOCK_POINTWISE=1 is explicitly exported.
+      enabled: false
     critic_rollout_reorder:
       enabled: true
       group_size: 5

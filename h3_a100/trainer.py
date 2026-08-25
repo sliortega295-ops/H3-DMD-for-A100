@@ -19,6 +19,7 @@ from .checkpoint_boundary_offload import (
     install_checkpoint_boundary_cpu_offload,
 )
 from .checkpointing import H3A100CheckpointMixin
+from .fused_block_pointwise import install_fused_block_pointwise
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -50,6 +51,7 @@ class MiniMaxH3A100DmdTrainer(
         matched = a100.get("matched_compute", {})
         checkpointing = a100.get("activation_checkpointing", {})
         activation_policy = a100.get("activation_policy", {})
+        pointwise_fusion = a100.get("block_pointwise_fusion", {})
 
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
@@ -108,6 +110,16 @@ class MiniMaxH3A100DmdTrainer(
             str(int(bool(activation_policy.get("detailed_events", False)))),
         ).lower() in {"1", "true", "yes", "on"}
         self.boundary_offload_registration = None
+        fusion_value = os.environ.get(
+            "H3_FUSED_BLOCK_POINTWISE",
+            pointwise_fusion.get("enabled", False),
+        )
+        self.fused_block_pointwise_enabled = (
+            fusion_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(fusion_value, str)
+            else bool(fusion_value)
+        )
+        self.fused_block_pointwise_registration = None
 
         self.activation_offload_enabled = os.environ.get(
             "H3_ACTIVATION_OFFLOAD", "0"
@@ -169,6 +181,10 @@ class MiniMaxH3A100DmdTrainer(
             max_dynamic_cache_keys=self.adaln_dynamic_keys,
         )
         model.configure_activation_checkpoint_segments(self.activation_checkpoint_segment_size)
+        self.fused_block_pointwise_registration = install_fused_block_pointwise(
+            model.denoiser_module(),
+            enabled=self.fused_block_pointwise_enabled,
+        )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)
@@ -235,12 +251,13 @@ class MiniMaxH3A100DmdTrainer(
         )
         logger.info(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
-            "boundary_events={} legacy_threshold_offload={}",
+            "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
             self.boundary_offload_events,
             self.activation_offload_enabled,
+            self.fused_block_pointwise_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:
