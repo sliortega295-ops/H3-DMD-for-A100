@@ -77,6 +77,19 @@ def exact_cycle_range(current_iter: int) -> Iterator[None]:
     if controls_api:
         _check_cuda_status(cudart.cudaProfilerStart(), "cudaProfilerStart")
     dist.barrier()
+    # A node-level Nsight session needs a short propagation window after the
+    # controller process enters cudaProfilerStart.  Without it, one peer in a
+    # real 8-process capture can begin its first nested NVTX ranges before that
+    # process' collector has switched from armed to active.  This delay and its
+    # rendezvous are profiling-only and sit outside h3/full_cycle.
+    settle_seconds = float(os.environ.get("H3_NSYS_START_SETTLE_SECONDS", "0.25"))
+    if settle_seconds < 0.0 or settle_seconds > 5.0:
+        raise RuntimeError(
+            "H3_NSYS_START_SETTLE_SECONDS must be in the closed interval [0, 5]"
+        )
+    if settle_seconds:
+        time.sleep(settle_seconds)
+    dist.barrier()
 
     start_unix_ns = time.time_ns()
     start_perf_ns = time.perf_counter_ns()
