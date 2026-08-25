@@ -121,6 +121,19 @@ class MiniMaxH3A100DmdTrainer(
             if isinstance(fusion_value, str)
             else bool(fusion_value)
         )
+        pointwise_grad_value = os.environ.get(
+            "H3_FUSED_BLOCK_POINTWISE_GRAD",
+            pointwise_fusion.get("grad_enabled", False),
+        )
+        self.fused_block_pointwise_grad_enabled = (
+            pointwise_grad_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(pointwise_grad_value, str)
+            else bool(pointwise_grad_value)
+        )
+        if self.fused_block_pointwise_grad_enabled and not self.fused_block_pointwise_enabled:
+            raise ValueError(
+                "H3_FUSED_BLOCK_POINTWISE_GRAD requires H3_FUSED_BLOCK_POINTWISE=1"
+            )
         self.fused_block_pointwise_registration = None
         rotary_value = os.environ.get(
             "H3_FUSED_ROTARY",
@@ -207,6 +220,7 @@ class MiniMaxH3A100DmdTrainer(
         self.fused_block_pointwise_registration = install_fused_block_pointwise(
             model.denoiser_module(),
             enabled=self.fused_block_pointwise_enabled,
+            grad_enabled=self.fused_block_pointwise_grad_enabled,
         )
         self.fused_rotary_registration = install_fused_rotary(
             enabled=self.fused_rotary_enabled,
@@ -278,13 +292,15 @@ class MiniMaxH3A100DmdTrainer(
         )
         logger.info(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
-            "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={}",
+            "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
+            "fused_block_pointwise_grad={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
             self.boundary_offload_events,
             self.activation_offload_enabled,
             self.fused_block_pointwise_enabled,
+            self.fused_block_pointwise_grad_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:

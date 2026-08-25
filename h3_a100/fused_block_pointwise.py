@@ -19,14 +19,20 @@ EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE = 25 * EXPECTED_BLOCK_COUNT
 @dataclasses.dataclass
 class FusedPointwiseStats:
     fused_nograd_block_calls: int = 0
+    fused_grad_block_calls: int = 0
     reference_grad_block_calls: int = 0
     fused_modulation_calls: int = 0
     fused_residual_calls: int = 0
+    fused_grad_modulation_calls: int = 0
+    fused_grad_residual_calls: int = 0
+    fused_grad_modulation_backward_calls: int = 0
+    fused_grad_residual_backward_calls: int = 0
 
 
 @dataclasses.dataclass
 class FusedPointwiseRegistration:
     enabled: bool
+    grad_enabled: bool
     source_sha256: str | None
     block_count: int
     stats: FusedPointwiseStats
@@ -37,6 +43,7 @@ class FusedPointwiseRegistration:
     def receipt(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
+            "grad_enabled": self.grad_enabled,
             "source_sha256": self.source_sha256,
             "block_count": self.block_count,
             "stats": self.snapshot(),
@@ -56,7 +63,8 @@ def _patched_forward(
     attention_mask=None,
 ):
     stats: FusedPointwiseStats = self._h3_fused_pointwise_stats
-    if torch.is_grad_enabled():
+    grad_enabled = torch.is_grad_enabled()
+    if grad_enabled and not self._h3_fused_pointwise_grad_enabled:
         stats.reference_grad_block_calls += 1
         return self._h3_original_forward(
             hidden_states,
@@ -69,43 +77,113 @@ def _patched_forward(
     # Lazy import keeps the baseline/import-only path independent of Triton.
     from .triton_fused_pointwise import fused_modulate, fused_residual
 
+    if grad_enabled:
+        modulate = lambda value, scale, shift, indices: _FusedModulateAutograd.apply(
+            value, scale, shift, indices, stats
+        )
+        residual_update = lambda residual, gate, branch, indices: _FusedResidualAutograd.apply(
+            residual, gate, branch, indices, stats
+        )
+    else:
+        modulate = fused_modulate
+        residual_update = fused_residual
+
     shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaln_proj(temb)
 
     residual = hidden_states
     norm_hidden_states = self.norm1(hidden_states)
-    norm_hidden_states = fused_modulate(
+    norm_hidden_states = modulate(
         norm_hidden_states,
         scale_msa,
         shift_msa,
         adaln_indices,
     )
-    stats.fused_modulation_calls += 1
+    if not grad_enabled:
+        stats.fused_modulation_calls += 1
     attn_output = self.attn(norm_hidden_states, rotary_emb, attention_mask)
-    hidden_states = fused_residual(residual, gate_msa, attn_output, adaln_indices)
-    stats.fused_residual_calls += 1
+    hidden_states = residual_update(residual, gate_msa, attn_output, adaln_indices)
+    if not grad_enabled:
+        stats.fused_residual_calls += 1
 
     residual = hidden_states
     norm_hidden_states = self.norm2(hidden_states)
-    norm_hidden_states = fused_modulate(
+    norm_hidden_states = modulate(
         norm_hidden_states,
         scale_mlp,
         shift_mlp,
         adaln_indices,
     )
-    stats.fused_modulation_calls += 1
+    if not grad_enabled:
+        stats.fused_modulation_calls += 1
     ff_output = self.ff(norm_hidden_states)
-    hidden_states = fused_residual(residual, gate_mlp, ff_output, adaln_indices)
-    stats.fused_residual_calls += 1
-    stats.fused_nograd_block_calls += 1
+    hidden_states = residual_update(residual, gate_mlp, ff_output, adaln_indices)
+    if not grad_enabled:
+        stats.fused_residual_calls += 1
+    if grad_enabled:
+        stats.fused_grad_block_calls += 1
+    else:
+        stats.fused_nograd_block_calls += 1
     return hidden_states
 
 
-def install_fused_block_pointwise(transformer: torch.nn.Module, *, enabled: bool) -> FusedPointwiseRegistration:
+class _FusedModulateAutograd(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, value, scale, shift, indices, stats):
+        if scale.requires_grad or shift.requires_grad or indices.requires_grad:
+            raise RuntimeError("H3 fused pointwise grad path requires frozen AdaLN tables/indices")
+        from .triton_fused_pointwise import fused_modulate
+
+        ctx.save_for_backward(scale, indices)
+        ctx.stats = stats
+        stats.fused_grad_modulation_calls += 1
+        return fused_modulate(value, scale, shift, indices)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        from .triton_fused_pointwise import fused_modulate_backward
+
+        scale, indices = ctx.saved_tensors
+        ctx.stats.fused_grad_modulation_backward_calls += 1
+        grad_value = fused_modulate_backward(grad_output.contiguous(), scale, indices)
+        return grad_value, None, None, None, None
+
+
+class _FusedResidualAutograd(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, residual, gate, branch, indices, stats):
+        if gate.requires_grad or indices.requires_grad:
+            raise RuntimeError("H3 fused pointwise grad path requires frozen AdaLN gates/indices")
+        from .triton_fused_pointwise import fused_residual
+
+        ctx.save_for_backward(gate, indices)
+        ctx.stats = stats
+        stats.fused_grad_residual_calls += 1
+        return fused_residual(residual, gate, branch, indices)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        from .triton_fused_pointwise import fused_residual_branch_backward
+
+        gate, indices = ctx.saved_tensors
+        ctx.stats.fused_grad_residual_backward_calls += 1
+        grad_output = grad_output.contiguous()
+        grad_branch = fused_residual_branch_backward(grad_output, gate, indices)
+        # The eager add backward returns the incoming BF16 gradient unchanged
+        # for the residual edge.  Returning the same tensor preserves that
+        # exact value and avoids a redundant device copy.
+        return grad_output, None, grad_branch, None, None
+
+
+def install_fused_block_pointwise(
+    transformer: torch.nn.Module, *, enabled: bool, grad_enabled: bool = False
+) -> FusedPointwiseRegistration:
     """Patch the 50 pinned block instances without editing shared Diffusers."""
 
     blocks = list(getattr(transformer, "transformer_blocks", ()))
     if not enabled:
-        return FusedPointwiseRegistration(False, None, len(blocks), FusedPointwiseStats())
+        if grad_enabled:
+            raise RuntimeError("H3 fused grad pointwise requires base pointwise fusion enabled")
+        return FusedPointwiseRegistration(False, False, None, len(blocks), FusedPointwiseStats())
 
     if len(blocks) != EXPECTED_BLOCK_COUNT:
         raise RuntimeError(
@@ -127,8 +205,9 @@ def install_fused_block_pointwise(transformer: torch.nn.Module, *, enabled: bool
             raise RuntimeError("H3 fused pointwise was installed more than once")
         object.__setattr__(block, "_h3_original_forward", block.forward)
         object.__setattr__(block, "_h3_fused_pointwise_stats", stats)
+        object.__setattr__(block, "_h3_fused_pointwise_grad_enabled", bool(grad_enabled))
         object.__setattr__(block, "forward", types.MethodType(_patched_forward, block))
-    return FusedPointwiseRegistration(True, source_sha256, len(blocks), stats)
+    return FusedPointwiseRegistration(True, bool(grad_enabled), source_sha256, len(blocks), stats)
 
 
 def validate_cycle(registration: FusedPointwiseRegistration, start: dict[str, int]) -> dict[str, int]:
@@ -142,9 +221,14 @@ def validate_cycle(registration: FusedPointwiseRegistration, start: dict[str, in
         "fused_nograd_block_calls": EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE,
         "fused_modulation_calls": 2 * EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE,
         "fused_residual_calls": 2 * EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE,
+        "fused_grad_block_calls": 600 if registration.grad_enabled else 0,
+        "reference_grad_block_calls": 0 if registration.grad_enabled else 600,
+        "fused_grad_modulation_calls": 1200 if registration.grad_enabled else 0,
+        "fused_grad_residual_calls": 1200 if registration.grad_enabled else 0,
+        "fused_grad_modulation_backward_calls": 600 if registration.grad_enabled else 0,
+        "fused_grad_residual_backward_calls": 600 if registration.grad_enabled else 0,
     }
     errors = [f"{key}={delta[key]} expected={value}" for key, value in expected.items() if delta[key] != value]
     if errors:
         raise RuntimeError(f"H3 fused pointwise cycle contract failed: {'; '.join(errors)}")
     return delta
-

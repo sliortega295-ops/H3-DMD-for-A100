@@ -8,8 +8,9 @@ directly, avoiding the temporary full-sequence tensors.
 
 This module is imported lazily only when the opt-in production flag is enabled;
 the baseline path therefore does not acquire a Triton dependency at import time.
-The kernels intentionally have no autograd implementation.  Gradient-bearing
-forward and checkpoint replay keep using the pinned upstream implementation.
+The optional custom-autograd wrapper reuses the same forward kernels and calls
+the exact BF16 input-gradient kernels below.  Grid AdaLN tables are frozen, so
+only activation/branch gradients are produced.
 """
 
 from __future__ import annotations
@@ -92,6 +93,59 @@ def _bf16_residual_exact(residual, gate, branch):
 
 
 @triton.jit
+def _bf16_modulate_backward_exact(grad_output, scale):
+    """Return ``grad_output * bf16(1 + scale)`` with eager BF16 rounding."""
+
+    return tl.inline_asm_elementwise(
+        asm="""
+        {
+          .reg .b16 gh0,gh1,sh0,sh1,h0,h1,o0,o1;
+          .reg .f32 gf0,gf1,sf0,sf1,t0,t1,p0,p1;
+          mov.b32 {gh0,gh1}, $1;
+          mov.b32 {sh0,sh1}, $2;
+          cvt.f32.bf16 gf0, gh0; cvt.f32.bf16 gf1, gh1;
+          cvt.f32.bf16 sf0, sh0; cvt.f32.bf16 sf1, sh1;
+          add.f32 t0, sf0, 1.0; add.f32 t1, sf1, 1.0;
+          cvt.rn.bf16.f32 h0, t0; cvt.rn.bf16.f32 h1, t1;
+          cvt.f32.bf16 t0, h0; cvt.f32.bf16 t1, h1;
+          mul.f32 p0, gf0, t0; mul.f32 p1, gf1, t1;
+          cvt.rn.bf16.f32 o0, p0; cvt.rn.bf16.f32 o1, p1;
+          mov.b32 $0, {o0,o1};
+        }
+        """,
+        constraints="=r,r,r",
+        args=[grad_output, scale],
+        dtype=tl.bfloat16,
+        is_pure=True,
+        pack=2,
+    )
+
+
+@triton.jit
+def _bf16_mul_exact(left, right):
+    return tl.inline_asm_elementwise(
+        asm="""
+        {
+          .reg .b16 lh0,lh1,rh0,rh1,o0,o1;
+          .reg .f32 lf0,lf1,rf0,rf1,p0,p1;
+          mov.b32 {lh0,lh1}, $1;
+          mov.b32 {rh0,rh1}, $2;
+          cvt.f32.bf16 lf0, lh0; cvt.f32.bf16 lf1, lh1;
+          cvt.f32.bf16 rf0, rh0; cvt.f32.bf16 rf1, rh1;
+          mul.f32 p0, lf0, rf0; mul.f32 p1, lf1, rf1;
+          cvt.rn.bf16.f32 o0, p0; cvt.rn.bf16.f32 o1, p1;
+          mov.b32 $0, {o0,o1};
+        }
+        """,
+        constraints="=r,r,r",
+        args=[left, right],
+        dtype=tl.bfloat16,
+        is_pure=True,
+        pack=2,
+    )
+
+
+@triton.jit
 def _modulate_kernel(
     value,
     scale,
@@ -141,6 +195,54 @@ def _residual_kernel(
     branch_values = tl.load(branch + offsets, mask=mask, other=0.0)
     result = _bf16_residual_exact(residual_values, gates, branch_values)
     tl.store(output + offsets, result, mask=mask)
+
+
+@triton.jit
+def _modulate_backward_kernel(
+    grad_output,
+    scale,
+    indices,
+    grad_value,
+    n_elements,
+    hidden_size: tl.constexpr,
+    sequence_length,
+    block_size: tl.constexpr,
+):
+    offsets = tl.program_id(0) * block_size + tl.arange(0, block_size)
+    mask = offsets < n_elements
+    rows = offsets // hidden_size
+    columns = offsets - rows * hidden_size
+    sequence_rows = rows % sequence_length
+    table_rows = tl.load(indices + sequence_rows, mask=mask, other=0).to(tl.int64)
+    table_offsets = table_rows * hidden_size + columns
+    gradients = tl.load(grad_output + offsets, mask=mask, other=0.0)
+    scales = tl.load(scale + table_offsets, mask=mask, other=0.0)
+    result = _bf16_modulate_backward_exact(gradients, scales)
+    tl.store(grad_value + offsets, result, mask=mask)
+
+
+@triton.jit
+def _residual_branch_backward_kernel(
+    grad_output,
+    gate,
+    indices,
+    grad_branch,
+    n_elements,
+    hidden_size: tl.constexpr,
+    sequence_length,
+    block_size: tl.constexpr,
+):
+    offsets = tl.program_id(0) * block_size + tl.arange(0, block_size)
+    mask = offsets < n_elements
+    rows = offsets // hidden_size
+    columns = offsets - rows * hidden_size
+    sequence_rows = rows % sequence_length
+    table_rows = tl.load(indices + sequence_rows, mask=mask, other=0).to(tl.int64)
+    table_offsets = table_rows * hidden_size + columns
+    gradients = tl.load(grad_output + offsets, mask=mask, other=0.0)
+    gates = tl.load(gate + table_offsets, mask=mask, other=0.0)
+    result = _bf16_mul_exact(gradients, gates)
+    tl.store(grad_branch + offsets, result, mask=mask)
 
 
 def _validate_common(
@@ -229,3 +331,45 @@ def fused_residual(
         block_size=block_size,
     )
     return output
+
+
+def fused_modulate_backward(
+    grad_output: torch.Tensor,
+    scale: torch.Tensor,
+    indices: torch.Tensor,
+) -> torch.Tensor:
+    n_elements, sequence_length, hidden_size = _validate_common(grad_output, scale, indices)
+    grad_value = torch.empty_like(grad_output)
+    block_size = 256
+    _modulate_backward_kernel[(triton.cdiv(n_elements, block_size),)](
+        grad_output,
+        scale,
+        indices,
+        grad_value,
+        n_elements=n_elements,
+        hidden_size=hidden_size,
+        sequence_length=sequence_length,
+        block_size=block_size,
+    )
+    return grad_value
+
+
+def fused_residual_branch_backward(
+    grad_output: torch.Tensor,
+    gate: torch.Tensor,
+    indices: torch.Tensor,
+) -> torch.Tensor:
+    n_elements, sequence_length, hidden_size = _validate_common(grad_output, gate, indices)
+    grad_branch = torch.empty_like(grad_output)
+    block_size = 256
+    _residual_branch_backward_kernel[(triton.cdiv(n_elements, block_size),)](
+        grad_output,
+        gate,
+        indices,
+        grad_branch,
+        n_elements=n_elements,
+        hidden_size=hidden_size,
+        sequence_length=sequence_length,
+        block_size=block_size,
+    )
+    return grad_branch

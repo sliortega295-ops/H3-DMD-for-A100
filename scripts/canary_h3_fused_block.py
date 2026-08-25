@@ -64,7 +64,9 @@ def main():
     reference = make_block(hidden_size)
     candidate = copy.deepcopy(reference)
     transformer = _Transformer([candidate] + [copy.deepcopy(candidate) for _ in range(49)])
-    registration = install_fused_block_pointwise(transformer, enabled=True)
+    registration = install_fused_block_pointwise(
+        transformer, enabled=True, grad_enabled=True
+    )
     indices = torch.arange(sequence_length, device="cuda", dtype=torch.int64) % 6
     temb = torch.empty((6, 64), device="cuda", dtype=torch.bfloat16)
     hidden = torch.randn((1, sequence_length, hidden_size), device="cuda", dtype=torch.bfloat16)
@@ -79,8 +81,9 @@ def main():
     candidate_input = hidden.detach().clone().requires_grad_(True)
     reference_output = reference(reference_input, temb, indices, None)
     candidate_output = transformer.transformer_blocks[0](candidate_input, temb, indices, None)
-    reference_output.float().sum().backward()
-    candidate_output.float().sum().backward()
+    upstream = torch.randn_like(reference_output)
+    reference_output.backward(upstream)
+    candidate_output.backward(upstream)
     if not torch.equal(reference_output, candidate_output):
         raise RuntimeError("grad-enabled patched block output changed")
     if not torch.equal(reference_input.grad, candidate_input.grad):
