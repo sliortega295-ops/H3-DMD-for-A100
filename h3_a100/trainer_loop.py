@@ -23,6 +23,7 @@ from lightx2v_train.runtime.parallel import set_parallel_gradient_sync
 from lightx2v_train.runtime.sequence_parallel import sync_sequence_parallel_gradients
 
 from .matched_contract import FAKE_ROLE, STUDENT_ROLE, validate_global_snapshots
+from .nsys_range import exact_cycle_range
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER
 from .fused_block_pointwise import validate_cycle as validate_fused_pointwise_cycle
 from .fused_qk_rmsnorm_rotary import validate_cycle as validate_fused_qk_cycle
@@ -68,10 +69,11 @@ class H3A100LoopMixin:
             self._begin_fa3_nograd_split_cycle()
             self._begin_lora_scale1_cycle()
             runtime_state_start = self.shared_model.runtime_state_stats()
-            with self._nvtx("h3/student_step"):
-                running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
-            with self._nvtx("h3/critic_phase"):
-                running_fake = self._fake_steps(samples, grad_accum_iters)
+            with exact_cycle_range(current_iter):
+                with self._nvtx("h3/student_step"):
+                    running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+                with self._nvtx("h3/critic_phase"):
+                    running_fake = self._fake_steps(samples, grad_accum_iters)
             if self.matched_compute_enabled:
                 self._validate_matched_cycle(current_iter)
             self._validate_boundary_offload_cycle(current_iter)
