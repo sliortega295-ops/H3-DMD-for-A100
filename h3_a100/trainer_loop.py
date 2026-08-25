@@ -26,6 +26,7 @@ from .matched_contract import FAKE_ROLE, STUDENT_ROLE, validate_global_snapshots
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER
 from .fused_block_pointwise import validate_cycle as validate_fused_pointwise_cycle
 from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
+from .nsys_range import exact_cycle_range
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -60,10 +61,11 @@ class H3A100LoopMixin:
             self._begin_fused_pointwise_cycle()
             self._begin_fused_rotary_cycle()
             runtime_state_start = self.shared_model.runtime_state_stats()
-            with self._nvtx("h3/student_step"):
-                running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
-            with self._nvtx("h3/critic_phase"):
-                running_fake = self._fake_steps(samples, grad_accum_iters)
+            with exact_cycle_range(current_iter):
+                with self._nvtx("h3/student_step"):
+                    running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
+                with self._nvtx("h3/critic_phase"):
+                    running_fake = self._fake_steps(samples, grad_accum_iters)
             if self.matched_compute_enabled:
                 self._validate_matched_cycle(current_iter)
             self._validate_boundary_offload_cycle(current_iter)
