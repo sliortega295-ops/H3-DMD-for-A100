@@ -57,8 +57,7 @@ def _rotary_kernel(
     cosine,
     sine,
     output,
-    n_elements: tl.constexpr,
-    sequence_length: tl.constexpr,
+    n_elements,
     num_heads: tl.constexpr,
     head_dim: tl.constexpr,
     rotary_dim: tl.constexpr,
@@ -70,7 +69,10 @@ def _rotary_kernel(
     rotary_mask = valid & (head_columns < rotary_dim)
 
     rows = offsets // head_dim
-    sequence_rows = (rows // num_heads) % sequence_length
+    # The frozen benchmark contract is B1/rank. Keeping the sequence extent
+    # out of constexpr arguments prevents one Triton compilation per
+    # rank-qualified packed sequence length.
+    sequence_rows = rows // num_heads
     rotary_columns = head_columns
     half = rotary_dim // 2
     rotated_offsets = tl.where(
@@ -113,6 +115,8 @@ def fused_apply_rotary_emb(
     if cos.shape != sin.shape or cos.device != hidden_states.device or sin.device != hidden_states.device:
         raise RuntimeError("H3 fused rotary cos/sin shape or device mismatch")
     batch, sequence_length, num_heads, head_dim = map(int, hidden_states.shape)
+    if batch != 1:
+        raise RuntimeError(f"H3 fused rotary is registered only for the frozen B1 contract, got B={batch}")
     rotary_dim = int(cos.shape[1])
     if int(cos.shape[0]) != sequence_length:
         raise RuntimeError(
@@ -141,7 +145,6 @@ def fused_apply_rotary_emb(
         sin,
         output,
         n_elements=n_elements,
-        sequence_length=sequence_length,
         num_heads=num_heads,
         head_dim=head_dim,
         rotary_dim=rotary_dim,

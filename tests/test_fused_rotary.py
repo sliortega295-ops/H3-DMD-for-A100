@@ -26,3 +26,6 @@ def test_rotary_kernel_preserves_explicit_bf16_rounding_boundaries():
     assert "requires SM80+" in source
     assert "torch.empty_like" in source
     assert "rotary_columns < half" in source
+    assert "n_elements: tl.constexpr" not in source
+    assert "sequence_length: tl.constexpr" not in source
+    assert "frozen B1 contract" in source
