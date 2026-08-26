@@ -10,6 +10,7 @@ from h3_a100.fused_qk_rmsnorm_rotary import (
     FusedQKStats,
     validate_cycle,
 )
+from h3_a100.fused_rotary import FusedRotaryRegistration, FusedRotaryStats
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,12 +27,32 @@ def test_qk_rmsnorm_rotary_is_independent_default_off_and_cycle_audited():
 
     assert '"H3_FUSED_QK_RMSNORM_ROTARY"' in trainer
     assert "requires H3_FUSED_ROTARY=1" in trainer
+    assert "base_rotary_registration=self.fused_rotary_registration" in trainer
     assert "qk_rmsnorm: false" in config
     assert "if torch.is_grad_enabled():" in wrapper
     assert "if rotary_emb is None:" in wrapper
     assert "PINNED_PROCESSOR_CALL_SHA256" in wrapper
     assert "fused_qk_rmsnorm_rotary" in kernel
     assert "_validate_fused_qk_cycle" in loop
+    assert "base_rotary_registration.stats.fused_nograd_calls += 2" in wrapper
+
+
+def test_qk_feature_requires_live_base_rotary_registration():
+    # The check happens before the pinned Diffusers import/model audit, making
+    # this a cheap unit-level proof that the parent census cannot be bypassed.
+    class Transformer:
+        transformer_blocks = [object()] * 50
+
+    from h3_a100.fused_qk_rmsnorm_rotary import install_fused_qk_rmsnorm_rotary
+
+    with pytest.raises(RuntimeError, match="installed base rotary registration"):
+        install_fused_qk_rmsnorm_rotary(Transformer(), enabled=True)
+
+    disabled = FusedRotaryRegistration(False, False, None, FusedRotaryStats())
+    with pytest.raises(RuntimeError, match="installed base rotary registration"):
+        install_fused_qk_rmsnorm_rotary(
+            Transformer(), enabled=True, base_rotary_registration=disabled
+        )
 
 
 def test_cycle_receipt_is_fail_closed():

@@ -10,6 +10,8 @@ from typing import Any, Callable
 
 import torch
 
+from .fused_rotary import FusedRotaryRegistration
+
 
 PINNED_PROCESSOR_CALL_SHA256 = (
     "0db0e6aa98d226a24f88079b97abb3f546b7af5f81f5fad19d6e35336a0638d4"
@@ -52,7 +54,10 @@ def _source_sha256(function: Callable[..., Any]) -> str:
 
 
 def install_fused_qk_rmsnorm_rotary(
-    transformer: torch.nn.Module, *, enabled: bool
+    transformer: torch.nn.Module,
+    *,
+    enabled: bool,
+    base_rotary_registration: FusedRotaryRegistration | None = None,
 ) -> FusedQKRegistration:
     """Patch the pinned processor class while leaving all grad calls reference."""
 
@@ -63,6 +68,10 @@ def install_fused_qk_rmsnorm_rotary(
     if len(blocks) != EXPECTED_BLOCK_COUNT:
         raise RuntimeError(
             f"H3 fused Q/K path requires {EXPECTED_BLOCK_COUNT} blocks, got {len(blocks)}"
+        )
+    if base_rotary_registration is None or not base_rotary_registration.enabled:
+        raise RuntimeError(
+            "H3 fused Q/K RMSNorm rotary requires the installed base rotary registration"
         )
 
     module = importlib.import_module("diffusers.models.transformers.transformer_minimax_h3")
@@ -153,6 +162,10 @@ def install_fused_qk_rmsnorm_rotary(
             eps=attn.norm_k.eps,
         )
         stats.fused_nograd_qk_calls += 2
+        # The two exact rotary operations are subsumed by this fused kernel, so
+        # retain the parent feature's physical-call census rather than making
+        # its otherwise-correct fail-closed gate report zero calls.
+        base_rotary_registration.stats.fused_nograd_calls += 2
         output = module.dispatch_attention_fn(
             query,
             key,

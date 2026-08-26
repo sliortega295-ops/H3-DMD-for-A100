@@ -323,6 +323,7 @@ class MiniMaxH3A100DmdTrainer(
         self.fused_qk_rmsnorm_rotary_registration = install_fused_qk_rmsnorm_rotary(
             model.denoiser_module(),
             enabled=self.fused_qk_rmsnorm_rotary_enabled,
+            base_rotary_registration=self.fused_rotary_registration,
         )
         self.fused_swiglu_registration = install_fused_swiglu(
             model.denoiser_module(),
