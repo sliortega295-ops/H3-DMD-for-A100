@@ -27,6 +27,7 @@ from .model import FAKE_ADAPTER, STUDENT_ADAPTER
 from .fused_block_pointwise import validate_cycle as validate_fused_pointwise_cycle
 from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
 from .fused_swiglu import validate_cycle as validate_fused_swiglu_cycle
+from .fa3_nograd_splits import validate_cycle as validate_fa3_nograd_split_cycle
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -61,6 +62,7 @@ class H3A100LoopMixin:
             self._begin_fused_pointwise_cycle()
             self._begin_fused_rotary_cycle()
             self._begin_fused_swiglu_cycle()
+            self._begin_fa3_nograd_split_cycle()
             runtime_state_start = self.shared_model.runtime_state_stats()
             with self._nvtx("h3/student_step"):
                 running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
@@ -72,6 +74,7 @@ class H3A100LoopMixin:
             self._validate_fused_pointwise_cycle(current_iter)
             self._validate_fused_rotary_cycle(current_iter)
             self._validate_fused_swiglu_cycle(current_iter)
+            self._validate_fa3_nograd_split_cycle(current_iter)
             runtime_state_end = self.shared_model.runtime_state_stats()
             logger.info(
                 "[h3-a100][runtime-state] iter={} rank={} delta={} final_role={} "
@@ -278,6 +281,12 @@ class H3A100LoopMixin:
             None if registration is None or not registration.enabled else registration.snapshot()
         )
 
+    def _begin_fa3_nograd_split_cycle(self) -> None:
+        registration = getattr(self, "fa3_nograd_split_registration", None)
+        self._fa3_nograd_split_cycle_start = (
+            None if registration is None or not registration.enabled else registration.snapshot()
+        )
+
     def _validate_fused_pointwise_cycle(self, current_iter: int) -> None:
         registration = getattr(self, "fused_block_pointwise_registration", None)
         if registration is None or not registration.enabled:
@@ -323,6 +332,22 @@ class H3A100LoopMixin:
             current_iter,
             get_rank(),
             registration.source_sha256,
+            delta,
+        )
+
+    def _validate_fa3_nograd_split_cycle(self, current_iter: int) -> None:
+        registration = getattr(self, "fa3_nograd_split_registration", None)
+        if registration is None or not registration.enabled:
+            return
+        start = self._fa3_nograd_split_cycle_start
+        if start is None:
+            raise RuntimeError("H3 FA3 no-grad split cycle baseline is missing")
+        delta = validate_fa3_nograd_split_cycle(registration, start)
+        logger.info(
+            "[h3-a100][fa3-nograd-splits] iter={} rank={} num_splits={} delta={}",
+            current_iter,
+            get_rank(),
+            registration.num_splits,
             delta,
         )
 
