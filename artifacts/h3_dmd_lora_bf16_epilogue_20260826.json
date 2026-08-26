@@ -1,0 +1,84 @@
+{
+  "run_id": "iteration_376_lora_bf16_epilogue_world16_20260826",
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "head": "bf504375c60c621507e28744afcc29725eb0432b",
+  "world_size": 16,
+  "node_count": 2,
+  "nodes": {
+    "node0_exit": 0,
+    "node1_exit": 0
+  },
+  "gpus_per_node": 8,
+  "profiled": false,
+  "seconds": 828.355,
+  "parent_run": "iteration_367_lora_scale1_counterfix_20260826",
+  "parent_seconds": 836.298,
+  "delta_seconds": -7.942999999999984,
+  "reduction_percent": 0.9497810589048382,
+  "speedup": 1.009588883992974,
+  "original_control_run": "iteration_327_grid1000_control_20260825",
+  "original_control_seconds": 904.986,
+  "cumulative_delta_seconds": -76.63099999999997,
+  "cumulative_reduction_percent": 8.467644803345022,
+  "cumulative_speedup": 1.0925098538670015,
+  "application_forward_census": {
+    "student": 24,
+    "fake": 6,
+    "teacher": 1
+  },
+  "grad_forward_census": {
+    "student": 1,
+    "fake": 5,
+    "teacher": 0
+  },
+  "backward_census": {
+    "student": 1,
+    "fake": 5
+  },
+  "grid_replay": {
+    "checkpoint_wrap_count": 300,
+    "scoped_execution_count": 600,
+    "cache_hit_count": 600,
+    "cache_miss_count": 0
+  },
+  "lora_epilogue": {
+    "live_runtime_dtype": {
+      "base": "BF16",
+      "lora_A_output": "BF16",
+      "lora_B_weight": "BF16"
+    },
+    "module_count": 312,
+    "fused_nograd_epilogue_calls": 7488,
+    "reference_grad_epilogue_calls": 3744,
+    "disabled_teacher_reference_calls": 312,
+    "invalid_contract_calls": 0,
+    "rounding_contract": "BF16 LoRA-B materialization rounding is preserved before BF16 residual add"
+  },
+  "canaries": {
+    "single_gpu_nonzero_peft": {
+      "status": "PASS",
+      "output_bitwise_equal": true,
+      "gradient_bitwise_equal": true,
+      "reference_median_ms": 14.858751773834229,
+      "candidate_median_ms": 13.44921588897705,
+      "paired_median_delta_ms": -0.9512958526611328
+    },
+    "two_rank_fsdp2": {
+      "status": "PASS",
+      "rank_output_sha_match": true,
+      "lora_A_dtype": "BF16",
+      "lora_B_dtype": "BF16"
+    }
+  },
+  "failed_attempts_preserved": {
+    "iteration_373": "rejected FP32 micro assumption failed closed in live FSDP runtime",
+    "iteration_374": "proved live projected/LoRA-B/base are all BF16 before measured cycle"
+  },
+  "peak_allocated_gib_rank0": 34.79,
+  "peak_reserved_gib_rank0": 36.63,
+  "oom_delta": {
+    "node0": 0,
+    "node1": 0
+  },
+  "claim_limit": "One matched unprofiled run; no confidence interval."
+}
