@@ -99,6 +99,11 @@ training:
       # independent grad switch adds exact custom-autograd forward/backward.
       enabled: false
       grad_enabled: false
+    swiglu_fusion:
+      # Only the SiLU-times-value activation is fused; projection GEMMs and
+      # PEFT LoRA modules remain untouched. Both paths are explicit opt-ins.
+      enabled: false
+      grad_enabled: false
     critic_rollout_reorder:
       enabled: true
       group_size: 5

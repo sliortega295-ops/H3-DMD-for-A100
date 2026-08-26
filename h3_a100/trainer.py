@@ -21,6 +21,7 @@ from .checkpoint_boundary_offload import (
 from .checkpointing import H3A100CheckpointMixin
 from .fused_block_pointwise import install_fused_block_pointwise
 from .fused_rotary import install_fused_rotary
+from .fused_swiglu import install_fused_swiglu
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -54,6 +55,7 @@ class MiniMaxH3A100DmdTrainer(
         activation_policy = a100.get("activation_policy", {})
         pointwise_fusion = a100.get("block_pointwise_fusion", {})
         rotary_fusion = a100.get("rotary_fusion", {})
+        swiglu_fusion = a100.get("swiglu_fusion", {})
 
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
@@ -156,6 +158,27 @@ class MiniMaxH3A100DmdTrainer(
         if self.fused_rotary_grad_enabled and not self.fused_rotary_enabled:
             raise ValueError("H3_FUSED_ROTARY_GRAD requires H3_FUSED_ROTARY=1")
         self.fused_rotary_registration = None
+        swiglu_value = os.environ.get(
+            "H3_FUSED_SWIGLU",
+            swiglu_fusion.get("enabled", False),
+        )
+        self.fused_swiglu_enabled = (
+            swiglu_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(swiglu_value, str)
+            else bool(swiglu_value)
+        )
+        swiglu_grad_value = os.environ.get(
+            "H3_FUSED_SWIGLU_GRAD",
+            swiglu_fusion.get("grad_enabled", False),
+        )
+        self.fused_swiglu_grad_enabled = (
+            swiglu_grad_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(swiglu_grad_value, str)
+            else bool(swiglu_grad_value)
+        )
+        if self.fused_swiglu_grad_enabled and not self.fused_swiglu_enabled:
+            raise ValueError("H3_FUSED_SWIGLU_GRAD requires H3_FUSED_SWIGLU=1")
+        self.fused_swiglu_registration = None
 
         self.activation_offload_enabled = os.environ.get(
             "H3_ACTIVATION_OFFLOAD", "0"
@@ -226,6 +249,11 @@ class MiniMaxH3A100DmdTrainer(
             enabled=self.fused_rotary_enabled,
             grad_enabled=self.fused_rotary_grad_enabled,
         )
+        self.fused_swiglu_registration = install_fused_swiglu(
+            model.denoiser_module(),
+            enabled=self.fused_swiglu_enabled,
+            grad_enabled=self.fused_swiglu_grad_enabled,
+        )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)
@@ -293,7 +321,7 @@ class MiniMaxH3A100DmdTrainer(
         logger.info(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
             "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
-            "fused_block_pointwise_grad={}",
+            "fused_block_pointwise_grad={} fused_swiglu={} fused_swiglu_grad={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
@@ -301,6 +329,8 @@ class MiniMaxH3A100DmdTrainer(
             self.activation_offload_enabled,
             self.fused_block_pointwise_enabled,
             self.fused_block_pointwise_grad_enabled,
+            self.fused_swiglu_enabled,
+            self.fused_swiglu_grad_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:
