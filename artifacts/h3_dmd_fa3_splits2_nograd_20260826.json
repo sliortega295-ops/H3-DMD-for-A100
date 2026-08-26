@@ -1,0 +1,52 @@
+{
+  "run_id": "iteration_365_fa3_splits2_nograd_20260826",
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "head": "9e6e4068d9751625f5fbae85178bd00cdd77eb5a",
+  "world_size": 16,
+  "profiled": false,
+  "seconds": 848.128,
+  "parent_run": "iteration_362_grid1000_fused_swiglu_nograd_20260826",
+  "parent_seconds": 849.808,
+  "delta_seconds": -1.68,
+  "reduction_percent": 0.19769171389301463,
+  "speedup": 1.001980833081799,
+  "original_control_run": "iteration_327_grid1000_control_20260825",
+  "original_control_seconds": 904.986,
+  "cumulative_delta_seconds": -56.858,
+  "cumulative_reduction_percent": 6.282749125400828,
+  "cumulative_speedup": 1.0670394091457893,
+  "application_forward_census": {"student": 24, "fake": 6, "teacher": 1},
+  "grad_forward_census": {"student": 1, "fake": 5, "teacher": 0},
+  "backward_census": {"student": 1, "fake": 5},
+  "grid_replay": {
+    "checkpoint_wrap_count": 300,
+    "scoped_execution_count": 600,
+    "cache_hit_count": 600,
+    "cache_miss_count": 0
+  },
+  "fa3_nograd_splits": {
+    "num_splits": 2,
+    "total_calls": 1924,
+    "no_grad_calls": 1300,
+    "grad_calls": 624,
+    "rewritten_calls": 1300,
+    "unexpected_input_num_splits": 0
+  },
+  "real_kernel_wrapper_canary": {
+    "status": "PASS",
+    "real_shape": [1, 37760, 56, 128],
+    "no_grad_matches_direct_num_splits_2_bitwise": true,
+    "grad_matches_direct_num_splits_1_bitwise": true
+  },
+  "direct_num_splits_1_vs_2_micro_parity": {
+    "bitwise_equal": false,
+    "max_abs": 0.000244140625,
+    "normalized_l2": 0.0022124087,
+    "cosine": 0.9999975565
+  },
+  "peak_allocated_gib_rank0": 34.79,
+  "peak_reserved_gib_rank0": 36.65,
+  "nodes": {"node0_exit": 0, "node1_exit": 0},
+  "oom_delta": {"node0": 0, "node1": 0},
+  "claim_limit": "One matched unprofiled run; no confidence interval and no end-to-end numerical paired receipt."
+}

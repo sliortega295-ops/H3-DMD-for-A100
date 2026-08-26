@@ -1,0 +1,234 @@
+{
+  "run_id": "iteration_364_flashattn_ncu_20260826",
+  "status": "PASS_DIAGNOSTIC",
+  "formal_parent_seconds": 849.808,
+  "formal_parent_run": "iteration_362_grid1000_fused_swiglu_nograd_20260826",
+  "profile_reference": "iteration_360_grid1000_fused_pointwise_grad_nsys2025_20260825",
+  "shape": [
+    1,
+    37760,
+    56,
+    128
+  ],
+  "dtype": "torch.bfloat16",
+  "backend_snapshot": "acb0f42e6901d3e9effa8a83bd32bc2bf0cfdfc2",
+  "ncu": "2023.2.1.0",
+  "native_microbenchmark": {
+    "forward_median_ms": 185.1269073486328,
+    "forward_times_ms": [
+      184.24217224121094,
+      185.1269073486328,
+      186.1334991455078,
+      186.38233947753906,
+      185.32249450683594,
+      185.12588500976562,
+      184.66201782226562
+    ],
+    "forward_max_allocated_bytes": 3518627840,
+    "forward_max_reserved_bytes": 3556769792,
+    "forward_finite": true,
+    "forward_plus_backward_median_ms": 694.667236328125,
+    "forward_plus_backward_times_ms": [
+      694.9048461914062,
+      694.4890747070312,
+      693.5951538085938,
+      694.667236328125,
+      695.5130615234375
+    ],
+    "backward_completed": true
+  },
+  "ncu_main_kernel": {
+    "forward": {
+      "metrics": {
+        "duration_ms": 231.6,
+        "compute_sm_throughput_percent": 73.51,
+        "sm_busy_percent": 73.77,
+        "issue_slots_busy_percent": 32.08,
+        "sol_memory_throughput_percent": 51.16,
+        "dram_throughput_percent": 1.5,
+        "l1_tex_throughput_percent": 51.34,
+        "l2_throughput_percent": 25.85,
+        "memory_throughput_gbytes_per_second": 23.21,
+        "one_or_more_eligible_percent": 32.08,
+        "no_eligible_percent": 67.92,
+        "active_warps_per_scheduler": 1.99,
+        "eligible_warps_per_scheduler": 0.4,
+        "warp_cycles_per_issued_instruction": 6.22,
+        "registers_per_thread": 255.0,
+        "dynamic_shared_memory_kbytes_per_block": 65.92,
+        "waves_per_sm": 76.48,
+        "theoretical_occupancy_percent": 12.5,
+        "achieved_occupancy_percent": 12.47
+      },
+      "tensor_pipeline_utilization_percent": 73.8,
+      "raw_csv": "artifacts/raw/fa3_forward_details.csv"
+    },
+    "backward": {
+      "metrics": {
+        "duration_ms": 639.63,
+        "compute_sm_throughput_percent": 66.09,
+        "sm_busy_percent": 66.3,
+        "issue_slots_busy_percent": 24.1,
+        "sol_memory_throughput_percent": 72.66,
+        "dram_throughput_percent": 1.98,
+        "l1_tex_throughput_percent": 72.89,
+        "l2_throughput_percent": 27.97,
+        "memory_throughput_gbytes_per_second": 30.74,
+        "one_or_more_eligible_percent": 24.1,
+        "no_eligible_percent": 75.9,
+        "active_warps_per_scheduler": 2.0,
+        "eligible_warps_per_scheduler": 0.34,
+        "warp_cycles_per_issued_instruction": 8.3,
+        "registers_per_thread": 255.0,
+        "dynamic_shared_memory_kbytes_per_block": 165.12,
+        "waves_per_sm": 152.96,
+        "theoretical_occupancy_percent": 12.5,
+        "achieved_occupancy_percent": 12.5
+      },
+      "tensor_pipeline_utilization_percent": 66.3,
+      "raw_csv": "artifacts/raw/fa3_backward_details.csv"
+    }
+  },
+  "num_splits_sweep": {
+    "status": "PASS",
+    "shape": [
+      1,
+      37760,
+      56,
+      128
+    ],
+    "dtype": "torch.bfloat16",
+    "softmax_scale": 0.08838834764831843,
+    "rows": [
+      {
+        "num_splits": 1,
+        "times_ms": [
+          184.25856018066406,
+          185.43411254882812,
+          185.5047607421875,
+          185.75462341308594,
+          185.30406188964844
+        ],
+        "median_ms": 185.43411254882812,
+        "mean_ms": 185.2512237548828,
+        "bitwise_equal_to_num_splits_1": true,
+        "max_abs_to_num_splits_1": 0.0,
+        "finite": true
+      },
+      {
+        "num_splits": 2,
+        "times_ms": [
+          183.44345092773438,
+          184.05477905273438,
+          183.36767578125,
+          182.2361602783203,
+          182.81983947753906
+        ],
+        "median_ms": 183.36767578125,
+        "mean_ms": 183.18438110351562,
+        "bitwise_equal_to_num_splits_1": false,
+        "max_abs_to_num_splits_1": 0.000244140625,
+        "finite": true
+      },
+      {
+        "num_splits": 4,
+        "times_ms": [
+          185.1822052001953,
+          185.36038208007812,
+          185.7822723388672,
+          186.49087524414062,
+          186.16217041015625
+        ],
+        "median_ms": 185.7822723388672,
+        "mean_ms": 185.7955810546875,
+        "bitwise_equal_to_num_splits_1": false,
+        "max_abs_to_num_splits_1": 0.000244140625,
+        "finite": true
+      },
+      {
+        "num_splits": 8,
+        "times_ms": [
+          190.6104278564453,
+          191.42247009277344,
+          192.1280059814453,
+          190.72000122070312,
+          191.23609924316406
+        ],
+        "median_ms": 191.23609924316406,
+        "mean_ms": 191.22340087890626,
+        "bitwise_equal_to_num_splits_1": false,
+        "max_abs_to_num_splits_1": 0.000244140625,
+        "finite": true
+      }
+    ]
+  },
+  "num_splits_1_vs_2_paired": {
+    "status": "PASS",
+    "shape": [
+      1,
+      37760,
+      56,
+      128
+    ],
+    "pairs": 10,
+    "times_ms": {
+      "1": [
+        185.73414611816406,
+        185.48838806152344,
+        185.49862670898438,
+        185.1084747314453,
+        185.41159057617188,
+        185.62867736816406,
+        185.44435119628906,
+        185.14022827148438,
+        185.4423065185547,
+        185.2375030517578
+      ],
+      "2": [
+        186.8236846923828,
+        182.28121948242188,
+        182.59251403808594,
+        183.4967041015625,
+        183.55711364746094,
+        183.99436950683594,
+        182.62937927246094,
+        183.27142333984375,
+        183.79058837890625,
+        184.1807403564453
+      ]
+    },
+    "median_ms": {
+      "1": 185.44332885742188,
+      "2": 183.52690887451172
+    },
+    "mean_ms": {
+      "1": 185.4134292602539,
+      "2": 183.66177368164062
+    },
+    "paired_delta_ms_num_splits_2_minus_1": [
+      1.08953857421875,
+      -3.2071685791015625,
+      -2.9061126708984375,
+      -1.6117706298828125,
+      -1.8544769287109375,
+      -1.634307861328125,
+      -2.814971923828125,
+      -1.868804931640625,
+      -1.6517181396484375,
+      -1.0567626953125
+    ],
+    "paired_median_delta_ms": -1.7530975341796875,
+    "parity": {
+      "bitwise_equal": false,
+      "max_abs": 0.000244140625,
+      "normalized_l2": 0.0022124086961425476,
+      "cosine": 0.999997556514486
+    }
+  },
+  "claim_boundary": {
+    "ncu_duration_is_formal_timing": false,
+    "microbenchmark_is_world16_timing": false,
+    "tensor_pipeline_utilization_is_mfu": false,
+    "num_splits_2_world16": "NOT_RUN"
+  }
+}
