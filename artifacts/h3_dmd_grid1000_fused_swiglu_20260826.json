@@ -1,0 +1,111 @@
+{
+  "application_forward_census": {
+    "fake": 6,
+    "student": 24,
+    "teacher": 1
+  },
+  "backward_census": {
+    "fake": 5,
+    "student": 1
+  },
+  "canary": {
+    "candidate_ms": 2.3453300003893673,
+    "checkpoint_custom_backward_calls": 1,
+    "checkpoint_forward": {
+      "bitwise_equal": true,
+      "cosine": 1.0,
+      "finite": true,
+      "max_abs": 0.0,
+      "normalized_l2": 0.0
+    },
+    "checkpoint_input_gradient": {
+      "bitwise_equal": false,
+      "cosine": 1.0,
+      "finite": true,
+      "max_abs": 0.001953125,
+      "normalized_l2": 1.1909241948160343e-06
+    },
+    "custom_backward_calls": 1,
+    "device": "NVIDIA A100-SXM4-40GB",
+    "driver_free_gib": 38.55889892578125,
+    "driver_total_gib": 39.39385986328125,
+    "forward": {
+      "bitwise_equal": true,
+      "cosine": 1.000000238418579,
+      "finite": true,
+      "max_abs": 0.0,
+      "normalized_l2": 0.0
+    },
+    "grad_forward": {
+      "bitwise_equal": true,
+      "cosine": 1.0,
+      "finite": true,
+      "max_abs": 0.0,
+      "normalized_l2": 0.0
+    },
+    "grad_sequence_length": 256,
+    "inner_dim": 14336,
+    "input_gradient": {
+      "bitwise_equal": false,
+      "cosine": 1.0,
+      "finite": true,
+      "max_abs": 0.001953125,
+      "normalized_l2": 1.1909241948160343e-06
+    },
+    "peak_allocated_gib": 16.13965892791748,
+    "peak_reserved_gib": 16.14453125,
+    "reference_ms": 6.212203798349947,
+    "sequence_length": 37760,
+    "speedup": 2.6487546730390212,
+    "status": "PASS",
+    "torch": "2.10.0+cu128"
+  },
+  "claim_boundary": "single matched unprofiled world16 outer cycle",
+  "claim_limit": "One matched run; improvement is directionally consistent with the profiled SiLU/multiply kernel budget but is not a confidence interval.",
+  "cumulative_delta_seconds": -55.178,
+  "cumulative_reduction_percent": 6.0971108945331745,
+  "cumulative_speedup": 1.064929960649935,
+  "delta_seconds": -3.5679999999999836,
+  "fused_swiglu": {
+    "fused_backward_calls": 0,
+    "fused_grad_calls": 0,
+    "fused_nograd_calls": 1250,
+    "reference_grad_calls": 600,
+    "source_sha256": "c229f3514b2da3ce3c0e81a9fdb79c510a0665dcb73cb6cc61d1e6c58cf7aa19"
+  },
+  "grad_forward_census": {
+    "fake": 5,
+    "student": 1,
+    "teacher": 0
+  },
+  "grid_replay": {
+    "cache_hit_count": 600,
+    "cache_miss_count": 0,
+    "checkpoint_wrap_count": 300,
+    "scoped_execution_count": 600
+  },
+  "head": "60a4a73770e48a6837ac8857cd44c28616963540",
+  "nodes": {
+    "node0_exit": 0,
+    "node1_exit": 0
+  },
+  "oom_delta": {
+    "node0": 0,
+    "node1": 0
+  },
+  "original_control_run": "iteration_327_grid1000_control_20260825",
+  "original_control_seconds": 904.986,
+  "parent_head": "7024f81614d9421583a107c148766af02cc2320a",
+  "parent_run": "iteration_359_grid1000_fused_pointwise_grad_fixed_20260825",
+  "parent_seconds": 853.376,
+  "peak_allocated_gib_rank0": 34.79,
+  "peak_reserved_gib_rank0": 36.65,
+  "profiled": false,
+  "reduction_percent": 0.41810409479525834,
+  "run_id": "iteration_362_grid1000_fused_swiglu_nograd_20260826",
+  "seconds": 849.808,
+  "single_variable": "H3_FUSED_SWIGLU=1; H3_FUSED_SWIGLU_GRAD=0",
+  "speedup": 1.0041985954474422,
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "world_size": 16
+}
