@@ -369,11 +369,13 @@ class H3A100LoopMixin:
             raise RuntimeError("H3 LoRA scale-one cycle baseline is missing")
         delta = validate_lora_scale1_cycle(registration, start)
         logger.info(
-            "[h3-a100][lora-scale1] iter={} rank={} source_sha={} modules={} delta={}",
+            "[h3-a100][lora-scale1] iter={} rank={} source_sha={} modules={} "
+            "epilogue={} delta={}",
             current_iter,
             get_rank(),
             registration.source_sha256,
             registration.module_count,
+            registration.epilogue_enabled,
             delta,
         )
 

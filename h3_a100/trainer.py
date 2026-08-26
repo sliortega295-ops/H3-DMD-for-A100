@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import torch
+import torch.distributed as dist
 from loguru import logger
 
 from lightx2v_train.runtime.distributed import get_rank
@@ -24,6 +25,7 @@ from .fused_rotary import install_fused_rotary
 from .fused_swiglu import install_fused_swiglu
 from .fa3_nograd_splits import install_fa3_nograd_splits
 from .lora_scale1_elision import install_lora_scale1_elision
+from .triton_lora_epilogue import warmup_lora_epilogue
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -204,6 +206,17 @@ class MiniMaxH3A100DmdTrainer(
             if isinstance(lora_scale1_value, str)
             else bool(lora_scale1_value)
         )
+        lora_epilogue_value = os.environ.get(
+            "H3_LORA_NOGRAD_EPILOGUE",
+            lora_scale1.get("fused_nograd_epilogue", False),
+        )
+        self.lora_nograd_epilogue_enabled = (
+            lora_epilogue_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(lora_epilogue_value, str)
+            else bool(lora_epilogue_value)
+        )
+        if self.lora_nograd_epilogue_enabled and not self.lora_scale1_elision_enabled:
+            raise ValueError("H3_LORA_NOGRAD_EPILOGUE requires H3_LORA_SCALE1_ELISION=1")
         self.lora_scale1_elision_registration = None
 
         self.activation_offload_enabled = os.environ.get(
@@ -286,6 +299,7 @@ class MiniMaxH3A100DmdTrainer(
         self.lora_scale1_elision_registration = install_lora_scale1_elision(
             model.denoiser_module(),
             enabled=self.lora_scale1_elision_enabled,
+            epilogue_enabled=self.lora_nograd_epilogue_enabled,
         )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
@@ -295,6 +309,18 @@ class MiniMaxH3A100DmdTrainer(
         self._release_full_cpu_checkpoint_storage()
         if self.gradient_checkpointing:
             model.enable_gradient_checkpointing()
+
+        # Compile/load the single Triton specialization before the cycle timer.
+        # One local rank compiles per node, then every rank launches the tiny
+        # warmup once so no first-use work contaminates the formal cycle.
+        if self.lora_nograd_epilogue_enabled:
+            if int(os.environ.get("LOCAL_RANK", 0)) == 0:
+                warmup_lora_epilogue(torch.cuda.current_device())
+            if dist.is_initialized():
+                dist.barrier()
+            warmup_lora_epilogue(torch.cuda.current_device())
+            if dist.is_initialized():
+                dist.barrier()
 
         if self.activation_policy == CHECKPOINT_BOUNDARY_CPU:
             event_path = None
@@ -355,7 +381,8 @@ class MiniMaxH3A100DmdTrainer(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
             "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
             "fused_block_pointwise_grad={} fused_swiglu={} fused_swiglu_grad={} "
-            "fa3_nograd_num_splits={} lora_scale1_elision={}",
+            "fa3_nograd_num_splits={} lora_scale1_elision={} "
+            "lora_nograd_epilogue={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
@@ -367,6 +394,7 @@ class MiniMaxH3A100DmdTrainer(
             self.fused_swiglu_grad_enabled,
             self.fa3_nograd_num_splits,
             self.lora_scale1_elision_enabled,
+            self.lora_nograd_epilogue_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:

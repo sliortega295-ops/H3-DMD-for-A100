@@ -11,6 +11,8 @@ from typing import Any, Callable
 
 import torch
 
+from .triton_lora_epilogue import fused_lora_b_residual
+
 
 PINNED_PEFT_LINEAR_FORWARD_SHA256 = (
     "ec0a80f5c5ce05f5dd90027952bb5d29aaf910e9d2ab40486a90e8a03c7e1cd9"
@@ -31,11 +33,14 @@ class LoRAScale1Stats:
     disabled_reference_calls: int = 0
     unsupported_reference_calls: int = 0
     invalid_contract_calls: int = 0
+    fused_nograd_epilogue_calls: int = 0
+    reference_grad_epilogue_calls: int = 0
 
 
 @dataclasses.dataclass
 class LoRAScale1Registration:
     enabled: bool
+    epilogue_enabled: bool
     source_sha256: str | None
     module_count: int
     stats: LoRAScale1Stats
@@ -46,6 +51,7 @@ class LoRAScale1Registration:
     def receipt(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
+            "epilogue_enabled": self.epilogue_enabled,
             "source_sha256": self.source_sha256,
             "module_count": self.module_count,
             "stats": self.snapshot(),
@@ -109,16 +115,35 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
     # been reconstructed, so code after the final operation is not guaranteed
     # to run even though this scale-one path was selected and executed.
     stats.elided_calls += 1
-    if torch.is_grad_enabled():
+    grad_enabled = torch.is_grad_enabled()
+    if grad_enabled:
         stats.grad_elided_calls += 1
     else:
         stats.no_grad_elided_calls += 1
+    if self._h3_lora_epilogue_enabled:
+        if grad_enabled:
+            stats.reference_grad_epilogue_calls += 1
+        else:
+            stats.fused_nograd_epilogue_calls += 1
 
     result = self.base_layer(x)
     result_dtype = result.dtype
     lora_A = self.lora_A[adapter]
     lora_B = self.lora_B[adapter]
     cast_x = self._cast_input_dtype(x, lora_A.weight.dtype)
+    if self._h3_lora_epilogue_enabled and not grad_enabled:
+        if (
+            lora_B.bias is not None
+            or lora_B._forward_pre_hooks
+            or lora_B._forward_hooks
+        ):
+            stats.invalid_contract_calls += 1
+            raise RuntimeError(
+                "H3 LoRA epilogue requires a hook-free bias-free LoRA-B Linear"
+            )
+        projected = lora_A(cast_x)
+        return fused_lora_b_residual(result, projected, lora_B.weight).to(result_dtype)
+
     # PEFT's pinned expression is `result + lora_B(lora_A(x)) * 1.0`.
     # Removing only the identity multiplication preserves both GEMMs and the
     # residual add while eliminating one full-output elementwise CUDA kernel.
@@ -127,12 +152,14 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
 
 
 def install_lora_scale1_elision(
-    transformer: torch.nn.Module, *, enabled: bool
+    transformer: torch.nn.Module, *, enabled: bool, epilogue_enabled: bool = False
 ) -> LoRAScale1Registration:
     """Patch the pinned PEFT Linear modules after both adapters are injected."""
 
     if not enabled:
-        return LoRAScale1Registration(False, None, 0, LoRAScale1Stats())
+        if epilogue_enabled:
+            raise RuntimeError("H3 LoRA epilogue requires scale-one elision")
+        return LoRAScale1Registration(False, False, None, 0, LoRAScale1Stats())
 
     from peft.tuners.lora.layer import Linear
 
@@ -156,8 +183,9 @@ def install_lora_scale1_elision(
             raise RuntimeError("H3 LoRA scale-one elision was installed more than once")
         object.__setattr__(module, "_h3_original_lora_forward", module.forward)
         object.__setattr__(module, "_h3_lora_scale1_stats", stats)
+        object.__setattr__(module, "_h3_lora_epilogue_enabled", epilogue_enabled)
         object.__setattr__(module, "forward", types.MethodType(_patched_forward, module))
-    return LoRAScale1Registration(True, source_sha256, len(modules), stats)
+    return LoRAScale1Registration(True, epilogue_enabled, source_sha256, len(modules), stats)
 
 
 def validate_cycle(
@@ -177,6 +205,12 @@ def validate_cycle(
         "disabled_reference_calls": EXPECTED_DISABLED_CALLS_PER_CYCLE,
         "unsupported_reference_calls": 0,
         "invalid_contract_calls": 0,
+        "fused_nograd_epilogue_calls": (
+            EXPECTED_NOGRAD_ELISIONS_PER_CYCLE if registration.epilogue_enabled else 0
+        ),
+        "reference_grad_epilogue_calls": (
+            EXPECTED_GRAD_ELISIONS_PER_CYCLE if registration.epilogue_enabled else 0
+        ),
     }
     errors = [
         f"{key}={delta[key]} expected={value}"
