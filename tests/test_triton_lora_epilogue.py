@@ -11,11 +11,10 @@ def test_lora_epilogue_contract_is_fixed_and_nograd_only():
     assert "LORA_RANK = 128" in kernel
     assert "BLOCK_M = 64" in kernel
     assert "BLOCK_N = 64" in kernel
-    assert 'input_precision="tf32"' in kernel
     assert "base.dtype != torch.bfloat16" in kernel
-    assert "projected.dtype != torch.float32" in kernel
-    assert "weight.dtype != torch.float32" in kernel
-    assert "matmul.allow_tf32" in kernel
+    assert "projected.dtype != torch.bfloat16" in kernel
+    assert "weight.dtype != torch.bfloat16" in kernel
+    assert "rounded_projection = accumulator.to(tl.bfloat16).to(tl.float32)" in kernel
     assert "not grad_enabled" in forward
     assert "reference_grad_epilogue_calls" in forward
     assert "warmup_lora_epilogue" in trainer

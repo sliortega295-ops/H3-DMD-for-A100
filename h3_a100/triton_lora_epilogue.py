@@ -1,4 +1,4 @@
-"""Fused no-grad LoRA-B TF32 GEMM, BF16 residual add, and BF16 store."""
+"""Fused no-grad BF16 LoRA-B GEMM, rounded residual add, and BF16 store."""
 
 from __future__ import annotations
 
@@ -73,12 +73,7 @@ def _lora_epilogue_kernel(
             & (offsets_k[:, None] + k_start < rank),
             other=0.0,
         )
-        accumulator = tl.dot(
-            projected_values,
-            weight_values,
-            accumulator,
-            input_precision="tf32",
-        )
+        accumulator = tl.dot(projected_values, weight_values, accumulator)
         projected_ptrs += block_k * stride_projected_k
         weight_ptrs += block_k * stride_weight_k
 
@@ -89,12 +84,16 @@ def _lora_epilogue_kernel(
     )
     mask = (offsets_m[:, None] < rows) & (offsets_n[None, :] < columns)
     base_values = tl.load(base_ptrs, mask=mask, other=0.0).to(tl.float32)
+    # The pinned eager path materializes the BF16 LoRA-B Linear output before
+    # the BF16 residual add. Preserve that intermediate rounding point even
+    # though the temporary output tensor itself is eliminated.
+    rounded_projection = accumulator.to(tl.bfloat16).to(tl.float32)
     output_ptrs = (
         output
         + offsets_m[:, None] * stride_output_row
         + offsets_n[None, :] * stride_output_col
     )
-    tl.store(output_ptrs, accumulator + base_values, mask=mask)
+    tl.store(output_ptrs, rounded_projection + base_values, mask=mask)
 
 
 def _validate(
@@ -106,9 +105,9 @@ def _validate(
         raise RuntimeError("H3 LoRA epilogue requires all operands on one device")
     if base.dtype != torch.bfloat16:
         raise RuntimeError(f"H3 LoRA epilogue requires BF16 base, got {base.dtype}")
-    if projected.dtype != torch.float32 or weight.dtype != torch.float32:
+    if projected.dtype != torch.bfloat16 or weight.dtype != torch.bfloat16:
         raise RuntimeError(
-            "H3 LoRA epilogue requires FP32 LoRA-A output and LoRA-B weight; "
+            "H3 LoRA epilogue requires live BF16 LoRA-A output and LoRA-B weight; "
             f"got projected={projected.dtype} weight={weight.dtype} "
             f"base={base.dtype} shapes="
             f"{tuple(projected.shape)}/{tuple(weight.shape)}/{tuple(base.shape)}"
@@ -130,20 +129,13 @@ def _validate(
     major, minor = torch.cuda.get_device_capability(base.device)
     if (major, minor) < (8, 0):
         raise RuntimeError(f"H3 LoRA epilogue requires SM80+, got sm_{major}{minor}")
-    if not torch.backends.cuda.matmul.allow_tf32:
-        raise RuntimeError("H3 LoRA epilogue requires the frozen TF32 matmul policy")
-    if torch.backends.cuda.matmul.fp32_precision != "tf32":
-        raise RuntimeError(
-            "H3 LoRA epilogue requires fp32_precision=tf32, got "
-            f"{torch.backends.cuda.matmul.fp32_precision!r}"
-        )
     return int(base.numel() // base.shape[-1]), int(base.shape[-1])
 
 
 def fused_lora_b_residual(
     base: torch.Tensor, projected: torch.Tensor, weight: torch.Tensor
 ) -> torch.Tensor:
-    """Return BF16 ``base + projected @ weight.T`` without FP32 output staging."""
+    """Return eager-equivalent BF16 residual output without LoRA-B staging."""
 
     rows, columns = _validate(base, projected, weight)
     flat_base = base.reshape(rows, columns)
@@ -180,7 +172,7 @@ def warmup_lora_epilogue(device: torch.device | int) -> None:
     """Compile and load the one production specialization outside cycle timing."""
 
     base = torch.zeros((64, 64), device=device, dtype=torch.bfloat16)
-    projected = torch.zeros((64, LORA_RANK), device=device, dtype=torch.float32)
-    weight = torch.zeros((64, LORA_RANK), device=device, dtype=torch.float32)
+    projected = torch.zeros((64, LORA_RANK), device=device, dtype=torch.bfloat16)
+    weight = torch.zeros((64, LORA_RANK), device=device, dtype=torch.bfloat16)
     fused_lora_b_residual(base, projected, weight)
     torch.cuda.synchronize(device)
