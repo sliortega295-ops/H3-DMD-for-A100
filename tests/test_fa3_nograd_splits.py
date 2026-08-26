@@ -26,6 +26,8 @@ def test_trainer_integration_is_default_off_and_cycle_audited():
     assert "_validate_fa3_nograd_split_cycle" in loop
     assert "fa3_nograd_splits:" in config
     assert "num_splits: 1" in config
+    assert "grad_num_splits: 1" in config
+    assert '"H3_FA3_GRAD_NUM_SPLITS"' in trainer
 
 
 def test_default_is_disabled_and_does_not_touch_kernel():
@@ -57,8 +59,30 @@ def test_only_no_grad_calls_are_rewritten():
         "no_grad_calls": 1,
         "grad_calls": 1,
         "rewritten_calls": 1,
+        "no_grad_rewritten_calls": 1,
+        "grad_rewritten_calls": 0,
         "unexpected_input_num_splits": 0,
     }
+
+
+def test_grad_candidate_is_independent_and_counted():
+    observed = []
+
+    def original(**kwargs):
+        observed.append(kwargs["num_splits"])
+        return kwargs["num_splits"]
+
+    config = SimpleNamespace(kernel_fn=original)
+    registration = install_fa3_nograd_splits(
+        num_splits=1, grad_num_splits=2, kernel_config=config
+    )
+    with torch.no_grad():
+        assert config.kernel_fn(num_splits=1) == 1
+    with torch.enable_grad():
+        assert config.kernel_fn(num_splits=1) == 2
+    assert observed == [1, 2]
+    assert registration.snapshot()["no_grad_rewritten_calls"] == 0
+    assert registration.snapshot()["grad_rewritten_calls"] == 1
 
 
 def test_cycle_contract_and_fail_closed_input():
@@ -68,10 +92,26 @@ def test_cycle_contract_and_fail_closed_input():
     registration.stats.no_grad_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE
     registration.stats.grad_calls = EXPECTED_GRAD_CALLS_PER_CYCLE
     registration.stats.rewritten_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE
+    registration.stats.no_grad_rewritten_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE
     delta = validate_cycle(registration, {})
     assert delta["rewritten_calls"] == EXPECTED_NOGRAD_CALLS_PER_CYCLE
     with torch.no_grad(), pytest.raises(RuntimeError, match="expected Diffusers"):
         config.kernel_fn(num_splits=4)
+
+
+def test_grad_cycle_contract():
+    config = SimpleNamespace(kernel_fn=lambda **kwargs: kwargs["num_splits"])
+    registration = install_fa3_nograd_splits(
+        num_splits=2, grad_num_splits=2, kernel_config=config
+    )
+    registration.stats.total_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE + EXPECTED_GRAD_CALLS_PER_CYCLE
+    registration.stats.no_grad_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE
+    registration.stats.grad_calls = EXPECTED_GRAD_CALLS_PER_CYCLE
+    registration.stats.rewritten_calls = registration.stats.total_calls
+    registration.stats.no_grad_rewritten_calls = EXPECTED_NOGRAD_CALLS_PER_CYCLE
+    registration.stats.grad_rewritten_calls = EXPECTED_GRAD_CALLS_PER_CYCLE
+    delta = validate_cycle(registration, {})
+    assert delta["rewritten_calls"] == EXPECTED_NOGRAD_CALLS_PER_CYCLE + EXPECTED_GRAD_CALLS_PER_CYCLE
 
 
 def test_rejects_unregistered_candidates_and_double_install():

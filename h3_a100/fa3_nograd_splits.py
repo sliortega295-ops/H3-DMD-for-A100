@@ -1,4 +1,9 @@
-"""Opt-in no-grad FA3 split scheduling for the pinned Hub kernel."""
+"""Opt-in FA3 split scheduling for the pinned Hub kernel.
+
+The original candidate rewrote only no-grad calls.  ``grad_num_splits`` is an
+independent, default-off extension so checkpoint forward/replay calls can be
+measured without changing the already validated no-grad policy.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +26,8 @@ class FA3NoGradSplitStats:
     no_grad_calls: int = 0
     grad_calls: int = 0
     rewritten_calls: int = 0
+    no_grad_rewritten_calls: int = 0
+    grad_rewritten_calls: int = 0
     unexpected_input_num_splits: int = 0
 
 
@@ -28,6 +35,7 @@ class FA3NoGradSplitStats:
 class FA3NoGradSplitRegistration:
     enabled: bool
     num_splits: int
+    grad_num_splits: int
     original_module: str | None
     original_qualname: str | None
     stats: FA3NoGradSplitStats
@@ -39,6 +47,7 @@ class FA3NoGradSplitRegistration:
         return {
             "enabled": self.enabled,
             "num_splits": self.num_splits,
+            "grad_num_splits": self.grad_num_splits,
             "original_module": self.original_module,
             "original_qualname": self.original_qualname,
             "stats": self.snapshot(),
@@ -48,28 +57,34 @@ class FA3NoGradSplitRegistration:
 def install_fa3_nograd_splits(
     *,
     num_splits: int,
+    grad_num_splits: int = 1,
     kernel_config: Any | None = None,
 ) -> FA3NoGradSplitRegistration:
-    """Rewrite only no-grad calls from FA3 num_splits=1 to the candidate.
+    """Rewrite selected FA3 calls from ``num_splits=1`` to split two.
 
-    The Diffusers backend, model processor, Q/K/V, mask, scale, and grad path
-    remain unchanged. Passing kernel_config is supported only to make the
-    wrapper independently testable without importing Diffusers.
+    The Diffusers backend, model processor, Q/K/V, mask, and scale remain
+    unchanged. The grad path scheduling is touched only when
+    ``grad_num_splits=2``.
+    Passing kernel_config is supported only to make the wrapper independently
+    testable without importing Diffusers.
     """
 
     num_splits = int(num_splits)
-    if num_splits < 1:
-        raise ValueError(f"H3 FA3 no-grad num_splits must be >=1, got {num_splits}")
-    if num_splits == 1:
-        return FA3NoGradSplitRegistration(
-            False, 1, None, None, FA3NoGradSplitStats()
-        )
-    if num_splits != 2:
+    grad_num_splits = int(grad_num_splits)
+    if num_splits not in {1, 2}:
         raise ValueError(
-            "The bounded H3 FA3 candidate only authorizes num_splits=2; "
-            f"got {num_splits}"
+            "The bounded H3 FA3 no-grad candidate only authorizes "
+            f"num_splits=1 or 2, got {num_splits}"
         )
-
+    if grad_num_splits not in {1, 2}:
+        raise ValueError(
+            "The bounded H3 FA3 grad candidate only authorizes num_splits=1 "
+            f"or 2, got {grad_num_splits}"
+        )
+    if num_splits == 1 and grad_num_splits == 1:
+        return FA3NoGradSplitRegistration(
+            False, 1, 1, None, None, FA3NoGradSplitStats()
+        )
     if kernel_config is None:
         from diffusers.models.attention_dispatch import (
             AttentionBackendName,
@@ -91,19 +106,25 @@ def install_fa3_nograd_splits(
     @functools.wraps(original)
     def wrapped(*args, **kwargs):
         stats.total_calls += 1
-        if torch.is_grad_enabled():
-            stats.grad_calls += 1
-            return original(*args, **kwargs)
-        stats.no_grad_calls += 1
         observed = int(kwargs.get("num_splits", 1))
         if observed != 1:
             stats.unexpected_input_num_splits += 1
             raise RuntimeError(
-                "H3 FA3 no-grad split expected Diffusers num_splits=1, "
+                "H3 FA3 split candidate expected Diffusers num_splits=1, "
                 f"observed {observed}"
             )
-        kwargs["num_splits"] = num_splits
-        stats.rewritten_calls += 1
+        if torch.is_grad_enabled():
+            stats.grad_calls += 1
+            if grad_num_splits == 2:
+                kwargs["num_splits"] = 2
+                stats.rewritten_calls += 1
+                stats.grad_rewritten_calls += 1
+            return original(*args, **kwargs)
+        stats.no_grad_calls += 1
+        if num_splits == 2:
+            kwargs["num_splits"] = 2
+            stats.rewritten_calls += 1
+            stats.no_grad_rewritten_calls += 1
         return original(*args, **kwargs)
 
     wrapped._h3_fa3_nograd_split_wrapper = True
@@ -111,6 +132,7 @@ def install_fa3_nograd_splits(
     return FA3NoGradSplitRegistration(
         True,
         num_splits,
+        grad_num_splits,
         getattr(original, "__module__", None),
         getattr(original, "__qualname__", None),
         stats,
@@ -128,7 +150,22 @@ def validate_cycle(
         "total_calls": EXPECTED_NOGRAD_CALLS_PER_CYCLE + EXPECTED_GRAD_CALLS_PER_CYCLE,
         "no_grad_calls": EXPECTED_NOGRAD_CALLS_PER_CYCLE,
         "grad_calls": EXPECTED_GRAD_CALLS_PER_CYCLE,
-        "rewritten_calls": EXPECTED_NOGRAD_CALLS_PER_CYCLE,
+        "rewritten_calls": (
+            (EXPECTED_NOGRAD_CALLS_PER_CYCLE if registration.num_splits == 2 else 0)
+            + (
+                EXPECTED_GRAD_CALLS_PER_CYCLE
+                if registration.grad_num_splits == 2
+                else 0
+            )
+        ),
+        "no_grad_rewritten_calls": (
+            EXPECTED_NOGRAD_CALLS_PER_CYCLE if registration.num_splits == 2 else 0
+        ),
+        "grad_rewritten_calls": (
+            EXPECTED_GRAD_CALLS_PER_CYCLE
+            if registration.grad_num_splits == 2
+            else 0
+        ),
         "unexpected_input_num_splits": 0,
     }
     errors = [

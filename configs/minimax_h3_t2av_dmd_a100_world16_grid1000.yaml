@@ -118,6 +118,8 @@ training:
       # Production remains num_splits=1. The measured kernel candidate is
       # enabled only by H3_FA3_NOGRAD_NUM_SPLITS=2.
       num_splits: 1
+      # Independent default-off checkpoint-forward/replay candidate.
+      grad_num_splits: 1
     lora_scale1_elision:
       # Opt-in removal of PEFT's identity multiply when rank == alpha.
       enabled: false

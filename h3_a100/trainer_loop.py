@@ -378,10 +378,12 @@ class H3A100LoopMixin:
             raise RuntimeError("H3 FA3 no-grad split cycle baseline is missing")
         delta = validate_fa3_nograd_split_cycle(registration, start)
         logger.info(
-            "[h3-a100][fa3-nograd-splits] iter={} rank={} num_splits={} delta={}",
+            "[h3-a100][fa3-nograd-splits] iter={} rank={} num_splits={} "
+            "grad_num_splits={} delta={}",
             current_iter,
             get_rank(),
             registration.num_splits,
+            registration.grad_num_splits,
             delta,
         )
 

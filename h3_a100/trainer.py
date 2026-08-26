@@ -245,6 +245,17 @@ class MiniMaxH3A100DmdTrainer(
                 "H3_FA3_NOGRAD_NUM_SPLITS must be 1 or the bounded candidate 2, "
                 f"got {self.fa3_nograd_num_splits}"
             )
+        self.fa3_grad_num_splits = int(
+            os.environ.get(
+                "H3_FA3_GRAD_NUM_SPLITS",
+                fa3_splits.get("grad_num_splits", 1),
+            )
+        )
+        if self.fa3_grad_num_splits not in {1, 2}:
+            raise ValueError(
+                "H3_FA3_GRAD_NUM_SPLITS must be 1 or the bounded candidate 2, "
+                f"got {self.fa3_grad_num_splits}"
+            )
         self.fa3_nograd_split_registration = None
         lora_scale1_value = os.environ.get(
             "H3_LORA_SCALE1_ELISION",
@@ -365,6 +376,7 @@ class MiniMaxH3A100DmdTrainer(
         )
         self.fa3_nograd_split_registration = install_fa3_nograd_splits(
             num_splits=self.fa3_nograd_num_splits,
+            grad_num_splits=self.fa3_grad_num_splits,
         )
         self.lora_scale1_elision_registration = install_lora_scale1_elision(
             model.denoiser_module(),
@@ -483,7 +495,7 @@ class MiniMaxH3A100DmdTrainer(
             "fused_block_pointwise_grad={} fused_rmsnorm_modulate={} "
             "fused_qk_rmsnorm_rotary={} fused_qk_rmsnorm_rotary_grad={} "
             "fused_swiglu={} fused_swiglu_grad={} "
-            "fa3_nograd_num_splits={} lora_scale1_elision={} "
+            "fa3_nograd_num_splits={} fa3_grad_num_splits={} lora_scale1_elision={} "
             "lora_nograd_epilogue={} lora_grad_epilogue={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
@@ -498,6 +510,7 @@ class MiniMaxH3A100DmdTrainer(
             self.fused_swiglu_enabled,
             self.fused_swiglu_grad_enabled,
             self.fa3_nograd_num_splits,
+            self.fa3_grad_num_splits,
             self.lora_scale1_elision_enabled,
             self.lora_nograd_epilogue_enabled,
             self.lora_grad_epilogue_enabled,
