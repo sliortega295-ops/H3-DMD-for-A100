@@ -1,0 +1,54 @@
+{
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "feature": "no_grad_qk_rmsnorm_exact_rotary_fusion",
+  "parent": {
+    "run_id": "iteration_379_rmsnorm_modulate_world16_20260826",
+    "head": "7a9e0e3da0eb477a22e29287a7b618b50e260f6f",
+    "seconds": 825.947
+  },
+  "candidate": {
+    "run_id": "iteration_383_qk_rmsnorm_rotary_world16_r2_20260826",
+    "head": "0f596ca82f4e547b3046f1ccf251f82ae9d3c662",
+    "seconds": 823.037,
+    "delta_seconds": -2.91,
+    "relative_change_percent": -0.3523228488026433,
+    "speedup": 1.003535685515961,
+    "trials": 1,
+    "profiled": false
+  },
+  "production_shape_canary": {
+    "shape": [1, 37760, 56, 128],
+    "dtype": "torch.bfloat16",
+    "parent_median_ms": 3.496959924697876,
+    "candidate_median_ms": 2.075648069381714,
+    "paired_median_delta_ms": -1.4182398319244385,
+    "max_abs": 0.03125,
+    "normalized_l2": 1.0092011275616184e-05,
+    "cosine": 0.9999999999490755
+  },
+  "workload": {
+    "world_size": 16,
+    "application_forwards": {"student": 24, "fake": 6, "teacher": 1},
+    "grad_forwards": {"student": 1, "fake": 5, "teacher": 0},
+    "backwards": {"student": 1, "fake": 5},
+    "sample_identity_count": 96,
+    "grid_replay": {"wraps": 300, "scopes": 600, "hits": 600, "misses": 0}
+  },
+  "feature_census_per_rank": {
+    "fused_nograd_attention_calls": 1250,
+    "fused_nograd_qk_calls": 2500,
+    "reference_grad_attention_calls": 600
+  },
+  "memory": {
+    "rank0_peak_allocated_gib": 34.79,
+    "rank0_end_reserved_gib": 36.65,
+    "cuda_oom_delta": 0,
+    "cgroup_oom_delta": 0
+  },
+  "preserved_failure": {
+    "run_id": "iteration_382_qk_rmsnorm_rotary_world16_20260826",
+    "status": "FAIL_FEATURE_CENSUS_INTEGRATION",
+    "timing_claim": "NONE"
+  },
+  "claim_boundary": "One unprofiled matched run; provisional mechanism validation, not a variance-qualified speedup."
+}
