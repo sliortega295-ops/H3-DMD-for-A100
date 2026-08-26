@@ -140,6 +140,67 @@ def _rotary_backward_kernel(
     tl.store(grad_input + offsets, result, mask=valid)
 
 
+@triton.jit
+def _qk_rmsnorm_rotary_kernel(
+    hidden_states,
+    weight,
+    cosine,
+    sine,
+    output,
+    num_heads: tl.constexpr,
+    head_dim: tl.constexpr,
+    rotary_dim: tl.constexpr,
+    eps: tl.constexpr,
+    block_size: tl.constexpr,
+):
+    """Fuse one frozen per-head RMSNorm row with exact BF16 rotary."""
+
+    row = tl.program_id(0)
+    columns = tl.arange(0, block_size)
+    mask = columns < head_dim
+    row_base = row * head_dim
+    values = tl.load(hidden_states + row_base + columns, mask=mask, other=0.0).to(
+        tl.float32
+    )
+    variance = tl.sum(values * values, axis=0) / head_dim
+    inverse_rms = tl.rsqrt(variance + eps)
+    weights = tl.load(weight + columns, mask=mask, other=0.0).to(tl.float32)
+    normalized = (values * inverse_rms * weights).to(tl.bfloat16)
+
+    half = rotary_dim // 2
+    rotary_mask = columns < rotary_dim
+    paired_columns = tl.where(columns < half, columns + half, columns - half)
+    paired_values = tl.load(
+        hidden_states + row_base + paired_columns,
+        mask=rotary_mask,
+        other=0.0,
+    ).to(tl.float32)
+    paired_weights = tl.load(weight + paired_columns, mask=rotary_mask, other=0.0).to(
+        tl.float32
+    )
+    paired_normalized = (paired_values * inverse_rms * paired_weights).to(tl.bfloat16)
+    rotated = tl.where(columns < half, -paired_normalized, paired_normalized).to(
+        tl.bfloat16
+    )
+
+    sequence_row = row // num_heads
+    table_offsets = sequence_row * rotary_dim + columns
+    cos_values = tl.load(cosine + table_offsets, mask=rotary_mask, other=0.0).to(
+        tl.bfloat16
+    )
+    sin_values = tl.load(sine + table_offsets, mask=rotary_mask, other=0.0).to(
+        tl.bfloat16
+    )
+    rotary_values = _bf16_rotary_exact(
+        normalized,
+        rotated,
+        cos_values,
+        sin_values,
+    )
+    result = tl.where(rotary_mask, rotary_values, normalized)
+    tl.store(output + row_base + columns, result, mask=mask)
+
+
 def fused_apply_rotary_emb(
     hidden_states: torch.Tensor,
     cos: torch.Tensor,
@@ -195,6 +256,91 @@ def fused_apply_rotary_emb(
         num_warps=8,
     )
     return output
+
+
+def fused_qk_rmsnorm_rotary(
+    hidden_states: torch.Tensor,
+    weight: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor,
+    *,
+    eps: float,
+) -> torch.Tensor:
+    """Fuse pinned no-grad Q/K RMSNorm with the validated rotary operation."""
+
+    if not hidden_states.is_cuda or not weight.is_cuda or not cos.is_cuda or not sin.is_cuda:
+        raise RuntimeError("H3 fused Q/K RMSNorm rotary requires CUDA tensors")
+    if hidden_states.dtype != torch.bfloat16 or weight.dtype != torch.bfloat16:
+        raise RuntimeError(
+            "H3 fused Q/K RMSNorm rotary requires BF16 hidden/weight, got "
+            f"{hidden_states.dtype}/{weight.dtype}"
+        )
+    if hidden_states.ndim != 4 or weight.ndim != 1 or cos.ndim != 2 or sin.ndim != 2:
+        raise RuntimeError(
+            "H3 fused Q/K RMSNorm rotary requires hidden=[B,S,NH,HD], "
+            "weight=[HD], cos/sin=[S,R]"
+        )
+    batch, sequence_length, num_heads, head_dim = map(int, hidden_states.shape)
+    if (batch, num_heads, head_dim) != (1, 56, 128):
+        raise RuntimeError(
+            "H3 fused Q/K RMSNorm rotary is preregistered for B1/NH56/HD128, got "
+            f"B{batch}/NH{num_heads}/HD{head_dim}"
+        )
+    if float(eps) != 1e-5:
+        raise RuntimeError(f"H3 fused Q/K RMSNorm rotary requires eps=1e-5, got {eps}")
+    if weight.numel() != head_dim:
+        raise RuntimeError(
+            f"H3 fused Q/K RMSNorm rotary weight has {weight.numel()} values, expected {head_dim}"
+        )
+    if cos.shape != sin.shape or int(cos.shape[0]) != sequence_length:
+        raise RuntimeError(
+            f"H3 fused Q/K RMSNorm rotary cos/sin mismatch {tuple(cos.shape)}/{tuple(sin.shape)}"
+        )
+    rotary_dim = int(cos.shape[1])
+    if rotary_dim != 96:
+        raise RuntimeError(
+            f"H3 fused Q/K RMSNorm rotary requires rotary_dim=96, got {rotary_dim}"
+        )
+    if cos.dtype not in {torch.float32, torch.bfloat16} or sin.dtype != cos.dtype:
+        raise RuntimeError(
+            f"H3 fused Q/K RMSNorm rotary requires matching FP32/BF16 cos/sin, got "
+            f"{cos.dtype}/{sin.dtype}"
+        )
+    tensors = (hidden_states, weight, cos, sin)
+    if any(tensor.device != hidden_states.device for tensor in tensors):
+        raise RuntimeError("H3 fused Q/K RMSNorm rotary operands must share one device")
+    if any(not tensor.is_contiguous() for tensor in tensors):
+        raise RuntimeError("H3 fused Q/K RMSNorm rotary requires contiguous operands")
+    major, minor = torch.cuda.get_device_capability(hidden_states.device)
+    if (major, minor) < (8, 0):
+        raise RuntimeError(f"H3 fused Q/K RMSNorm rotary requires SM80+, got sm_{major}{minor}")
+
+    output = torch.empty_like(hidden_states)
+    _qk_rmsnorm_rotary_kernel[(sequence_length * num_heads,)](
+        hidden_states,
+        weight,
+        cos,
+        sin,
+        output,
+        num_heads=num_heads,
+        head_dim=head_dim,
+        rotary_dim=rotary_dim,
+        eps=float(eps),
+        block_size=128,
+        num_warps=2,
+        num_stages=1,
+    )
+    return output
+
+
+@torch.no_grad()
+def warmup_fused_qk_rmsnorm_rotary(device: torch.device | int) -> None:
+    hidden = torch.zeros((1, 1, 56, 128), device=device, dtype=torch.bfloat16)
+    weight = torch.ones((128,), device=device, dtype=torch.bfloat16)
+    cos = torch.ones((1, 96), device=device, dtype=torch.float32)
+    sin = torch.zeros_like(cos)
+    fused_qk_rmsnorm_rotary(hidden, weight, cos, sin, eps=1e-5)
+    torch.cuda.synchronize(device)
 
 
 def fused_apply_rotary_emb_backward(
