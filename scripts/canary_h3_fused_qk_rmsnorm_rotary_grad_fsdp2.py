@@ -19,9 +19,6 @@ from h3_a100.fused_qk_rmsnorm_rotary import (
     _FusedQKRMSNormRotaryAutograd,
 )
 from h3_a100.fused_rotary import FusedRotaryStats
-from h3_a100.triton_fused_rotary import fused_apply_rotary_emb
-
-
 HEADS = 56
 HEAD_DIM = 128
 ROTARY_DIM = 96
@@ -96,8 +93,15 @@ def main() -> None:
     sin = torch.randn_like(cos)
     grad_output = torch.randn_like(base_hidden)
 
+    # The raw Triton rotary forward is not an autograd Function.  Reference the
+    # pinned Diffusers implementation so the comparison covers the exact native
+    # RMSNorm + rotary input-gradient path.
+    import diffusers.models.transformers.transformer_minimax_h3 as minimax_h3
+
+    reference_rotary = minimax_h3._apply_rotary_emb
+
     reference_hidden = base_hidden.detach().clone().requires_grad_(True)
-    reference = fused_apply_rotary_emb(
+    reference = reference_rotary(
         F.rms_norm(
             reference_hidden,
             (HEAD_DIM,),

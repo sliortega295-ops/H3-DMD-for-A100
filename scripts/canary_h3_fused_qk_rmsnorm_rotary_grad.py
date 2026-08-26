@@ -16,9 +16,6 @@ from h3_a100.fused_qk_rmsnorm_rotary import (
     _FusedQKRMSNormRotaryAutograd,
 )
 from h3_a100.fused_rotary import FusedRotaryStats
-from h3_a100.triton_fused_rotary import fused_apply_rotary_emb
-
-
 EPS = 1e-5
 HEADS = 56
 HEAD_DIM = 128
@@ -84,8 +81,16 @@ def main() -> None:
     qk_stats = FusedQKStats()
     rotary_stats = FusedRotaryStats()
 
+    # The direct Triton rotary helper is intentionally a raw forward kernel and
+    # therefore has no autograd edge.  Use the pinned Diffusers implementation
+    # as the reference so this canary exercises the real RMSNorm + rotary
+    # backward contract instead of failing before it reaches the candidate.
+    import diffusers.models.transformers.transformer_minimax_h3 as minimax_h3
+
+    reference_rotary = minimax_h3._apply_rotary_emb
+
     def reference():
-        output = fused_apply_rotary_emb(
+        output = reference_rotary(
             F.rms_norm(hidden, (HEAD_DIM,), weight=weight, eps=EPS), cos, sin
         )
         gradient = torch.autograd.grad(output, hidden, grad_output, retain_graph=False)[0]
