@@ -1,0 +1,30 @@
+{
+  "run_id": "iteration_390_lora_grad_epilogue_world16_20260826",
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "source_head": "67117586a56bb092a121b53d11213f87550f6891",
+  "only_changed_runtime_flag": "H3_LORA_GRAD_EPILOGUE=1",
+  "parent_seconds": 816.527,
+  "candidate_seconds": 813.609,
+  "delta_seconds": -2.918,
+  "relative_change_percent": -0.3573672395,
+  "speedup": 1.0035864893,
+  "profiled": false,
+  "trials": 1,
+  "world_size": 16,
+  "application_census": "PASS_24_6_1__1_5_0__1_5",
+  "grid_replay": "PASS_300_600_600_0",
+  "lora_epilogue_census_per_rank": {
+    "fused_nograd_epilogue_calls": 7488,
+    "fused_grad_epilogue_calls": 3744,
+    "fused_grad_epilogue_backward_calls": 1872,
+    "reference_grad_epilogue_calls": 0,
+    "invalid_contract_calls": 0
+  },
+  "production_shape_parity": "PASS_BITWISE_OUTPUT_AND_ALL_GRADIENTS",
+  "two_rank_fsdp2_canary": "PASS",
+  "peak_allocated_gib_rank0": 33.39,
+  "parent_peak_allocated_gib_rank0": 34.77,
+  "oom_delta": 0,
+  "cleanup": "PASS",
+  "claim_boundary": "one matched unprofiled run; not variance-qualified"
+}
