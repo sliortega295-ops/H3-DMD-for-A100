@@ -1,0 +1,49 @@
+{
+  "run_id": "iteration_393_fa3_splits2_grad_world16_20260826",
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "source_head": "e23423068bd4cfb913a25a032d8e6d7a26f32c8e",
+  "parent_run": "iteration_390_lora_grad_epilogue_world16_20260826",
+  "only_changed_runtime_flag": "H3_FA3_GRAD_NUM_SPLITS=2",
+  "world_size": 16,
+  "mesh": "world16_full_shard",
+  "profiled": false,
+  "trials": 1,
+  "timing_boundary": {
+    "definition": "rank0 train-start to post-world16 matched all_gather receipt",
+    "start": "2026-08-26 15:42:30.436",
+    "stop": "2026-08-26 15:56:02.465"
+  },
+  "parent_seconds": 813.609,
+  "candidate_seconds": 812.029,
+  "delta_seconds": -1.580,
+  "relative_change_percent": -0.1941964752,
+  "speedup": 1.0019457433,
+  "application_census": "PASS_24_6_1__1_5_0__1_5",
+  "sample_identity_count_world": 96,
+  "grid_replay": "PASS_300_600_600_0",
+  "fa3_census_per_rank": {
+    "total_calls": 1924,
+    "no_grad_calls": 1300,
+    "grad_calls": 624,
+    "rewritten_calls": 1924,
+    "no_grad_rewritten_calls": 1300,
+    "grad_rewritten_calls": 624,
+    "unexpected_input_num_splits": 0
+  },
+  "peak_allocated_gib_rank0": 33.39,
+  "reserved_gib_rank0_end": 35.61,
+  "canary": {
+    "status": "PASS",
+    "shape": [1, 37760, 56, 128],
+    "split1_forward_backward_ms": 747.6879272461,
+    "split2_forward_backward_ms": 689.4509887695,
+    "output_normalized_l2": 0.0022124087,
+    "min_gradient_cosine": 0.9999995241,
+    "checkpoint_original_and_replay_rewritten": 2
+  },
+  "node_exits": {"node0": 0, "node1": 0},
+  "oom_delta": {"node0": 0, "node1": 0},
+  "cleanup": "PASS_16_GPUS_IDLE_ALL_LOCKS_FREE",
+  "decision": "PROVISIONAL_PROMOTE_AS_CURRENT_BEST; gain is below variance qualification",
+  "claim_boundary": "one matched unprofiled run; not variance-qualified"
+}
