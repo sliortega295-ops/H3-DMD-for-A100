@@ -108,7 +108,10 @@ def _validate(
         raise RuntimeError(f"H3 LoRA epilogue requires BF16 base, got {base.dtype}")
     if projected.dtype != torch.float32 or weight.dtype != torch.float32:
         raise RuntimeError(
-            "H3 LoRA epilogue requires FP32 LoRA-A output and LoRA-B weight"
+            "H3 LoRA epilogue requires FP32 LoRA-A output and LoRA-B weight; "
+            f"got projected={projected.dtype} weight={weight.dtype} "
+            f"base={base.dtype} shapes="
+            f"{tuple(projected.shape)}/{tuple(weight.shape)}/{tuple(base.shape)}"
         )
     if base.ndim < 2 or projected.ndim != base.ndim or weight.ndim != 2:
         raise RuntimeError("H3 LoRA epilogue observed an unsupported operand rank")
