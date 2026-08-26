@@ -1,0 +1,92 @@
+{
+  "claim_boundary": [
+    "profile wall is diagnostic and is not a speed denominator",
+    "kernel temporal coverage is not SM utilization or MFU",
+    "NCCL exposed means not overlapped by non-NCCL kernels, not guaranteed removable time",
+    "nsys-ai stream-gap aggregation overcounts multi-stream idle; per-device exclusive partition is authoritative"
+  ],
+  "compute_union_median_s": 811.334630825,
+  "copy_exposed_median_s": 0.09563738050000001,
+  "copy_union_median_s": 0.0956418285,
+  "d2h_bytes_median": 203081.0,
+  "diagnostic_only": true,
+  "formal_unprofiled_seconds": 823.037,
+  "h2d_bytes_median": 250121928.0,
+  "hardware_metrics": {
+    "dram_read_pct": 11.15793008626381,
+    "dram_write_pct": 3.7871803338556136,
+    "minimum_coverage_fraction": 0.999826648412021,
+    "sm_active_pct": 97.77838269676141,
+    "sm_issue_pct": 27.108832918537185,
+    "tensor_active_pct": 71.53160018789671
+  },
+  "kernel_family_sum_median_per_rank_s": {
+    "cat_copy": 0.9359954555,
+    "copy_or_cast": 0.1140840605,
+    "flash_attention_backward": 152.76448599,
+    "flash_attention_forward": 354.813765558,
+    "fused_modulate_backward": 0.5473655695,
+    "fused_modulate_forward": 2.7089207385,
+    "fused_residual_backward": 0.544511653,
+    "fused_residual_forward": 3.7843043035,
+    "fused_rotary_backward": 0.49172384,
+    "fused_rotary_forward": 5.448146098,
+    "gather_or_index_select": 0.018222442,
+    "gemm": 251.26621099599998,
+    "layer_norm_backward": 2.5175217355,
+    "layer_norm_forward": 3.9034564644999996,
+    "nccl_all_gather": 138.588532984,
+    "nccl_all_reduce": 0.008853876,
+    "nccl_reduce_scatter": 46.683460549,
+    "optimizer_foreach": 0.3768210435,
+    "other": 13.9734501365,
+    "other_pointwise": 0.021433366500000002,
+    "pointwise_add": 9.1866517425,
+    "pointwise_mul": 3.2687242195,
+    "silu_backward": 0.9340942720000001,
+    "silu_forward": 1.69470103,
+    "split_copy": 2.4120647175
+  },
+  "nccl_exposed_median_s": 6.2508519085,
+  "nccl_hidden_median_s": 182.528046825,
+  "nccl_union_median_s": 188.7847731515,
+  "next_bounded_candidate": {
+    "name": "grad/replay QK RMSNorm plus exact rotary fusion",
+    "reason": "remaining per-rank layer_norm forward/backward sums are 3.903/2.518 s; the pinned grad/replay Q/K chain is an exact contiguous fusion boundary"
+  },
+  "no_traced_gpu_activity_median_s": 6.053642342,
+  "profile_head": "cc0e1b5bab240e8a99699516fef255f36ddcec4c",
+  "profiled_full_cycle_max_s": 824.427963112,
+  "profiled_full_cycle_median_s": 823.6567260585,
+  "profiled_full_cycle_min_s": 823.35346003,
+  "run_id": "iteration_384_qk_rmsnorm_rotary_nsys2025_20260826",
+  "runtime_candidate_head": "0f596ca82f4e547b3046f1ccf251f82ae9d3c662",
+  "status": "PROFILE_VALID",
+  "validity": {
+    "cgroup_oom_delta": 0,
+    "node0_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "node1_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "nsys_process_errors": 0,
+    "rank_receipts": 16,
+    "unresolved_kernel_ratio_lt_1pct": true
+  },
+  "workload_result_head": "bab7b3b6c240ff3410021bceb500f67a3bdf6011"
+}
