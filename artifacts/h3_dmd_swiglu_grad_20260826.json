@@ -1,0 +1,26 @@
+{
+  "run_id": "iteration_388_swiglu_grad_world16_20260826",
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "source_head": "ec5f36290d62452dd5d84e5dacffaf2bdac29f94",
+  "only_changed_runtime_flag": "H3_FUSED_SWIGLU_GRAD=1",
+  "parent_seconds": 820.008,
+  "candidate_seconds": 816.527,
+  "delta_seconds": -3.481,
+  "relative_change_percent": -0.4245080536,
+  "speedup": 1.0042631781,
+  "profiled": false,
+  "trials": 1,
+  "world_size": 16,
+  "application_census": "PASS_24_6_1__1_5_0__1_5",
+  "grid_replay": "PASS_300_600_600_0",
+  "swiglu_census_per_rank": {
+    "fused_nograd_calls": 1250,
+    "fused_grad_calls": 600,
+    "fused_backward_calls": 300,
+    "reference_grad_calls": 0
+  },
+  "peak_allocated_gib_rank0": 34.77,
+  "oom_delta": 0,
+  "cleanup": "PASS",
+  "claim_boundary": "one matched unprofiled run; not variance-qualified"
+}
