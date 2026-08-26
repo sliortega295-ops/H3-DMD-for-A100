@@ -1,0 +1,41 @@
+{
+  "run_id": "iteration_396_lora_epilogue_retune_20260826",
+  "measured_source_head": "da34365c001899149f0e9c68609124dab75f0d60",
+  "evidence_followup_head": "e394bad04eaf6054d52702b72ca2fe35bf7e1aee",
+  "parent_run": "iteration_393_fa3_splits2_grad_world16_20260826",
+  "parent_seconds": 812.029,
+  "candidate_seconds": 810.336,
+  "delta_seconds": -1.693,
+  "relative_change_percent": -0.20849,
+  "speedup": 1.00208926,
+  "trials": 1,
+  "profiled": false,
+  "candidate": {
+    "environment": "H3_LORA_EPILOGUE_BLOCK_N=128",
+    "parent_block_n": 64,
+    "candidate_block_n": 128,
+    "micro_projected_savings_seconds_per_gpu_cycle": 2.3113722682,
+    "micro_bitwise_equal": true
+  },
+  "gates": {
+    "ranks": "16/16",
+    "samples": 96,
+    "application_census": "24/6/1__1/5/0__1/5",
+    "grid_replay": "300/600/600/0",
+    "installed_peft_canary": "PASS_BITWISE",
+    "fsdp2_canary": "PASS_2_OF_2",
+    "cgroup_oom_delta_node0": 0,
+    "cgroup_oom_delta_node1": 0
+  },
+  "memory": {
+    "peak_allocated_gib_rank0": 33.39,
+    "reserved_gib_rank0_end": 35.61
+  },
+  "node_exits": {
+    "node0": 144,
+    "node1": 0
+  },
+  "status": "PASS_WORKLOAD_POSTCHECK_BUG",
+  "formal_eligibility": "NOT_FORMAL_PROMOTION_NODE0_WRAPPER_EXIT_144",
+  "claim_boundary": "One unprofiled run; variance-scale directional evidence only. The post-run logger check failed after the workload completed, so this result is not promoted as the formal current best."
+}
