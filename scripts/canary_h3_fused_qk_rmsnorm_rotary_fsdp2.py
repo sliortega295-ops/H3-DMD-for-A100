@@ -14,7 +14,10 @@ import torch.distributed as dist
 import torch.nn.functional as F
 from torch.distributed.fsdp import fully_shard
 
-from h3_a100.triton_fused_rotary import fused_qk_rmsnorm_rotary
+from h3_a100.triton_fused_rotary import (
+    fused_apply_rotary_emb,
+    fused_qk_rmsnorm_rotary,
+)
 
 
 HEADS = 56
@@ -39,9 +42,7 @@ class _Unit(torch.nn.Module):
             "weight_contiguous": bool(self.weight.is_contiguous()),
             "weight_numel": int(self.weight.numel()),
         }
-        import diffusers.models.transformers.transformer_minimax_h3 as module
-
-        reference = module._apply_rotary_emb(
+        reference = fused_apply_rotary_emb(
             F.rms_norm(hidden, (HEAD_DIM,), weight=self.weight, eps=EPS), cos, sin
         )
         candidate = fused_qk_rmsnorm_rotary(

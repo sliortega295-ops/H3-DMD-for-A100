@@ -11,7 +11,10 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from h3_a100.triton_fused_rotary import fused_qk_rmsnorm_rotary
+from h3_a100.triton_fused_rotary import (
+    fused_apply_rotary_emb,
+    fused_qk_rmsnorm_rotary,
+)
 
 
 EPS = 1e-5
@@ -60,8 +63,6 @@ def main() -> None:
     parser.add_argument("--pairs", type=int, default=5)
     args = parser.parse_args()
 
-    import diffusers.models.transformers.transformer_minimax_h3 as module
-
     torch.manual_seed(20260826)
     hidden = torch.randn(
         (1, args.sequence_length, HEADS, HEAD_DIM),
@@ -74,7 +75,9 @@ def main() -> None:
 
     def reference(value, affine, cosine, sine):
         normalized = F.rms_norm(value, (HEAD_DIM,), weight=affine, eps=EPS)
-        return module._apply_rotary_emb(normalized, cosine, sine)
+        # The parent workload already uses the validated exact fused rotary.
+        # This isolates only the incremental Q/K RMSNorm fusion.
+        return fused_apply_rotary_emb(normalized, cosine, sine)
 
     def candidate(value, affine, cosine, sine):
         return fused_qk_rmsnorm_rotary(
