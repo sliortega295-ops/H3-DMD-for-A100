@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 import torch
 
+from .triton_lora_epilogue import BLOCK_N as LORA_EPILOGUE_BLOCK_N
 from .triton_lora_epilogue import fused_lora_b_residual
 
 
@@ -59,6 +60,7 @@ class LoRAScale1Registration:
             "grad_epilogue_enabled": self.grad_epilogue_enabled,
             "source_sha256": self.source_sha256,
             "module_count": self.module_count,
+            "epilogue_block_n": LORA_EPILOGUE_BLOCK_N,
             "stats": self.snapshot(),
         }
 

@@ -10,7 +10,9 @@ def test_lora_epilogue_contract_is_fixed_and_grad_path_is_opt_in():
     trainer = (ROOT / "h3_a100" / "trainer.py").read_text()
     assert "LORA_RANK = 128" in kernel
     assert "BLOCK_M = 64" in kernel
-    assert "BLOCK_N = 64" in kernel
+    assert "DEFAULT_BLOCK_N = 64" in kernel
+    assert 'H3_LORA_EPILOGUE_BLOCK_N' in kernel
+    assert "BLOCK_N not in {64, 128}" in kernel
     assert "base.dtype != torch.bfloat16" in kernel
     assert "projected.dtype != torch.bfloat16" in kernel
     assert "weight.dtype != torch.bfloat16" in kernel
@@ -21,3 +23,4 @@ def test_lora_epilogue_contract_is_fixed_and_grad_path_is_opt_in():
     assert "fused_grad_epilogue_backward_calls" in forward
     assert "reference_grad_epilogue_calls" in forward
     assert "warmup_lora_epilogue" in trainer
+    assert '"epilogue_block_n": LORA_EPILOGUE_BLOCK_N' in forward

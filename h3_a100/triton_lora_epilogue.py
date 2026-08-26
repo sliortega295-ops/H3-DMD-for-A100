@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import torch
 import triton
 import triton.language as tl
@@ -9,7 +11,13 @@ import triton.language as tl
 
 LORA_RANK = 128
 BLOCK_M = 64
-BLOCK_N = 64
+DEFAULT_BLOCK_N = 64
+BLOCK_N = int(os.environ.get("H3_LORA_EPILOGUE_BLOCK_N", DEFAULT_BLOCK_N))
+if BLOCK_N not in {64, 128}:
+    raise RuntimeError(
+        "H3_LORA_EPILOGUE_BLOCK_N must be one of {64, 128}, "
+        f"got {BLOCK_N}"
+    )
 BLOCK_K = 32
 
 
