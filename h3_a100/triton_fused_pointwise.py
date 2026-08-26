@@ -146,6 +146,44 @@ def _bf16_mul_exact(left, right):
 
 
 @triton.jit
+def _rmsnorm_modulate_kernel(
+    value,
+    weight,
+    scale,
+    shift,
+    indices,
+    output,
+    hidden_size: tl.constexpr,
+    eps: tl.constexpr,
+    block_size: tl.constexpr,
+):
+    """Fuse one frozen RMSNorm row with the existing exact BF16 modulation.
+
+    The RMS reduction is accumulated in FP32.  The normalized value is rounded
+    to BF16 before modulation, matching the eager RMSNorm output boundary.  The
+    modulation helper then preserves its two eager BF16 rounding boundaries.
+    """
+
+    row = tl.program_id(0)
+    columns = tl.arange(0, block_size)
+    mask = columns < hidden_size
+    values = tl.load(value + row * hidden_size + columns, mask=mask, other=0.0).to(
+        tl.float32
+    )
+    variance = tl.sum(values * values, axis=0) / hidden_size
+    inverse_rms = tl.rsqrt(variance + eps)
+    weights = tl.load(weight + columns, mask=mask, other=0.0).to(tl.float32)
+    normalized = (values * inverse_rms * weights).to(tl.bfloat16)
+
+    table_row = tl.load(indices + row).to(tl.int64)
+    table_offsets = table_row * hidden_size + columns
+    scales = tl.load(scale + table_offsets, mask=mask, other=0.0)
+    shifts = tl.load(shift + table_offsets, mask=mask, other=0.0)
+    result = _bf16_modulate_exact(normalized, scales, shifts)
+    tl.store(output + row * hidden_size + columns, result, mask=mask)
+
+
+@triton.jit
 def _modulate_kernel(
     value,
     scale,
@@ -304,6 +342,82 @@ def fused_modulate(
         block_size=block_size,
     )
     return output
+
+
+def fused_rmsnorm_modulate(
+    value: torch.Tensor,
+    weight: torch.Tensor,
+    scale: torch.Tensor,
+    shift: torch.Tensor,
+    indices: torch.Tensor,
+    *,
+    eps: float,
+) -> torch.Tensor:
+    """Fuse the pinned B1 H3 RMSNorm and exact BF16 AdaLN modulation."""
+
+    _, sequence_length, hidden_size = _validate_common(value, scale, indices)
+    if value.shape[0] != 1:
+        raise RuntimeError(
+            f"H3 fused RMSNorm modulation is preregistered for B1, got B={value.shape[0]}"
+        )
+    if hidden_size != 5376:
+        raise RuntimeError(
+            f"H3 fused RMSNorm modulation requires hidden_size=5376, got {hidden_size}"
+        )
+    if float(eps) != 1e-5:
+        raise RuntimeError(f"H3 fused RMSNorm modulation requires eps=1e-5, got {eps}")
+    if (
+        weight.ndim != 1
+        or weight.numel() != hidden_size
+        or weight.dtype != torch.bfloat16
+        or not weight.is_cuda
+        or weight.device != value.device
+        or not weight.is_contiguous()
+    ):
+        raise RuntimeError(
+            "H3 fused RMSNorm modulation requires a contiguous CUDA BF16 "
+            f"weight[{hidden_size}], got shape={tuple(weight.shape)} "
+            f"dtype={weight.dtype} device={weight.device} contiguous={weight.is_contiguous()}"
+        )
+    if (
+        shift.shape != scale.shape
+        or shift.dtype != value.dtype
+        or not shift.is_cuda
+        or shift.device != value.device
+        or not shift.is_contiguous()
+    ):
+        raise RuntimeError(
+            f"H3 fused RMSNorm modulation shift mismatch scale={tuple(scale.shape)} "
+            f"shift={tuple(shift.shape)}"
+        )
+    output = torch.empty_like(value)
+    _rmsnorm_modulate_kernel[(sequence_length,)](
+        value,
+        weight,
+        scale,
+        shift,
+        indices,
+        output,
+        hidden_size=hidden_size,
+        eps=float(eps),
+        block_size=8192,
+        num_warps=8,
+        num_stages=1,
+    )
+    return output
+
+
+@torch.no_grad()
+def warmup_fused_rmsnorm_modulate(device: torch.device | int) -> None:
+    """Compile and launch the only production specialization before timing."""
+
+    value = torch.zeros((1, 1, 5376), device=device, dtype=torch.bfloat16)
+    weight = torch.ones((5376,), device=device, dtype=torch.bfloat16)
+    scale = torch.zeros((6, 5376), device=device, dtype=torch.bfloat16)
+    shift = torch.zeros_like(scale)
+    indices = torch.zeros((1,), device=device, dtype=torch.int64)
+    fused_rmsnorm_modulate(value, weight, scale, shift, indices, eps=1e-5)
+    torch.cuda.synchronize(device)
 
 
 def fused_residual(

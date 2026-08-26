@@ -142,6 +142,19 @@ class MiniMaxH3A100DmdTrainer(
             raise ValueError(
                 "H3_FUSED_BLOCK_POINTWISE_GRAD requires H3_FUSED_BLOCK_POINTWISE=1"
             )
+        rmsnorm_modulate_value = os.environ.get(
+            "H3_FUSED_RMSNORM_MODULATE",
+            pointwise_fusion.get("rmsnorm_modulate", False),
+        )
+        self.fused_rmsnorm_modulate_enabled = (
+            rmsnorm_modulate_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(rmsnorm_modulate_value, str)
+            else bool(rmsnorm_modulate_value)
+        )
+        if self.fused_rmsnorm_modulate_enabled and not self.fused_block_pointwise_enabled:
+            raise ValueError(
+                "H3_FUSED_RMSNORM_MODULATE requires H3_FUSED_BLOCK_POINTWISE=1"
+            )
         self.fused_block_pointwise_registration = None
         rotary_value = os.environ.get(
             "H3_FUSED_ROTARY",
@@ -283,6 +296,7 @@ class MiniMaxH3A100DmdTrainer(
             model.denoiser_module(),
             enabled=self.fused_block_pointwise_enabled,
             grad_enabled=self.fused_block_pointwise_grad_enabled,
+            rmsnorm_modulate_enabled=self.fused_rmsnorm_modulate_enabled,
         )
         self.fused_rotary_registration = install_fused_rotary(
             enabled=self.fused_rotary_enabled,
@@ -319,6 +333,17 @@ class MiniMaxH3A100DmdTrainer(
             if dist.is_initialized():
                 dist.barrier()
             warmup_lora_epilogue(torch.cuda.current_device())
+            if dist.is_initialized():
+                dist.barrier()
+
+        if self.fused_rmsnorm_modulate_enabled:
+            from .triton_fused_pointwise import warmup_fused_rmsnorm_modulate
+
+            if int(os.environ.get("LOCAL_RANK", 0)) == 0:
+                warmup_fused_rmsnorm_modulate(torch.cuda.current_device())
+            if dist.is_initialized():
+                dist.barrier()
+            warmup_fused_rmsnorm_modulate(torch.cuda.current_device())
             if dist.is_initialized():
                 dist.barrier()
 
@@ -380,7 +405,8 @@ class MiniMaxH3A100DmdTrainer(
         logger.info(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
             "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
-            "fused_block_pointwise_grad={} fused_swiglu={} fused_swiglu_grad={} "
+            "fused_block_pointwise_grad={} fused_rmsnorm_modulate={} "
+            "fused_swiglu={} fused_swiglu_grad={} "
             "fa3_nograd_num_splits={} lora_scale1_elision={} "
             "lora_nograd_epilogue={}",
             self.activation_policy,
@@ -390,6 +416,7 @@ class MiniMaxH3A100DmdTrainer(
             self.activation_offload_enabled,
             self.fused_block_pointwise_enabled,
             self.fused_block_pointwise_grad_enabled,
+            self.fused_rmsnorm_modulate_enabled,
             self.fused_swiglu_enabled,
             self.fused_swiglu_grad_enabled,
             self.fa3_nograd_num_splits,

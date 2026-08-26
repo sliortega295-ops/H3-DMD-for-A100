@@ -94,6 +94,9 @@ training:
       # forward unless H3_FUSED_BLOCK_POINTWISE=1 is explicitly exported.
       enabled: false
       grad_enabled: false
+      # Independent no-grad candidate.  Fuses each frozen RMSNorm with the
+      # existing exact modulation kernel; grad/checkpoint replay is unchanged.
+      rmsnorm_modulate: false
     rotary_fusion:
       # Both switches are opt-in. The base switch fuses no-grad calls; the
       # independent grad switch adds exact custom-autograd forward/backward.

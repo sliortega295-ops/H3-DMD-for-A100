@@ -14,6 +14,11 @@ import torch
 PINNED_BLOCK_FORWARD_SHA256 = "ca6d9ca44871d0ed10fceaa4eecd184a7ac907cbd3e3b8fd9f761b91598a944d"
 EXPECTED_BLOCK_COUNT = 50
 EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE = 25 * EXPECTED_BLOCK_COUNT
+EXPECTED_NOGRAD_RMSNORM_MODULATION_CALLS_PER_CYCLE = (
+    2 * EXPECTED_NOGRAD_BLOCK_CALLS_PER_CYCLE
+)
+EXPECTED_HIDDEN_SIZE = 5376
+EXPECTED_RMSNORM_EPS = 1e-5
 
 
 @dataclasses.dataclass
@@ -27,12 +32,14 @@ class FusedPointwiseStats:
     fused_grad_residual_calls: int = 0
     fused_grad_modulation_backward_calls: int = 0
     fused_grad_residual_backward_calls: int = 0
+    fused_nograd_rmsnorm_modulation_calls: int = 0
 
 
 @dataclasses.dataclass
 class FusedPointwiseRegistration:
     enabled: bool
     grad_enabled: bool
+    rmsnorm_modulate_enabled: bool
     source_sha256: str | None
     block_count: int
     stats: FusedPointwiseStats
@@ -44,6 +51,7 @@ class FusedPointwiseRegistration:
         return {
             "enabled": self.enabled,
             "grad_enabled": self.grad_enabled,
+            "rmsnorm_modulate_enabled": self.rmsnorm_modulate_enabled,
             "source_sha256": self.source_sha256,
             "block_count": self.block_count,
             "stats": self.snapshot(),
@@ -80,7 +88,11 @@ def _patched_forward(
         stats.fused_grad_block_calls += 1
 
     # Lazy import keeps the baseline/import-only path independent of Triton.
-    from .triton_fused_pointwise import fused_modulate, fused_residual
+    from .triton_fused_pointwise import (
+        fused_modulate,
+        fused_residual,
+        fused_rmsnorm_modulate,
+    )
 
     if grad_enabled:
         modulate = lambda value, scale, shift, indices: _FusedModulateAutograd.apply(
@@ -96,13 +108,24 @@ def _patched_forward(
     shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaln_proj(temb)
 
     residual = hidden_states
-    norm_hidden_states = self.norm1(hidden_states)
-    norm_hidden_states = modulate(
-        norm_hidden_states,
-        scale_msa,
-        shift_msa,
-        adaln_indices,
-    )
+    if not grad_enabled and self._h3_fused_rmsnorm_modulate_enabled:
+        norm_hidden_states = fused_rmsnorm_modulate(
+            hidden_states,
+            self.norm1.weight,
+            scale_msa,
+            shift_msa,
+            adaln_indices,
+            eps=self.norm1.eps,
+        )
+        stats.fused_nograd_rmsnorm_modulation_calls += 1
+    else:
+        norm_hidden_states = self.norm1(hidden_states)
+        norm_hidden_states = modulate(
+            norm_hidden_states,
+            scale_msa,
+            shift_msa,
+            adaln_indices,
+        )
     if not grad_enabled:
         stats.fused_modulation_calls += 1
     attn_output = self.attn(norm_hidden_states, rotary_emb, attention_mask)
@@ -111,13 +134,24 @@ def _patched_forward(
         stats.fused_residual_calls += 1
 
     residual = hidden_states
-    norm_hidden_states = self.norm2(hidden_states)
-    norm_hidden_states = modulate(
-        norm_hidden_states,
-        scale_mlp,
-        shift_mlp,
-        adaln_indices,
-    )
+    if not grad_enabled and self._h3_fused_rmsnorm_modulate_enabled:
+        norm_hidden_states = fused_rmsnorm_modulate(
+            hidden_states,
+            self.norm2.weight,
+            scale_mlp,
+            shift_mlp,
+            adaln_indices,
+            eps=self.norm2.eps,
+        )
+        stats.fused_nograd_rmsnorm_modulation_calls += 1
+    else:
+        norm_hidden_states = self.norm2(hidden_states)
+        norm_hidden_states = modulate(
+            norm_hidden_states,
+            scale_mlp,
+            shift_mlp,
+            adaln_indices,
+        )
     if not grad_enabled:
         stats.fused_modulation_calls += 1
     ff_output = self.ff(norm_hidden_states)
@@ -178,15 +212,23 @@ class _FusedResidualAutograd(torch.autograd.Function):
 
 
 def install_fused_block_pointwise(
-    transformer: torch.nn.Module, *, enabled: bool, grad_enabled: bool = False
+    transformer: torch.nn.Module,
+    *,
+    enabled: bool,
+    grad_enabled: bool = False,
+    rmsnorm_modulate_enabled: bool = False,
 ) -> FusedPointwiseRegistration:
     """Patch the 50 pinned block instances without editing shared Diffusers."""
 
     blocks = list(getattr(transformer, "transformer_blocks", ()))
     if not enabled:
-        if grad_enabled:
-            raise RuntimeError("H3 fused grad pointwise requires base pointwise fusion enabled")
-        return FusedPointwiseRegistration(False, False, None, len(blocks), FusedPointwiseStats())
+        if grad_enabled or rmsnorm_modulate_enabled:
+            raise RuntimeError(
+                "H3 fused grad/RMSNorm pointwise requires base pointwise fusion enabled"
+            )
+        return FusedPointwiseRegistration(
+            False, False, False, None, len(blocks), FusedPointwiseStats()
+        )
 
     if len(blocks) != EXPECTED_BLOCK_COUNT:
         raise RuntimeError(
@@ -202,6 +244,31 @@ def install_fused_block_pointwise(
             f"observed={source_sha256} expected={PINNED_BLOCK_FORWARD_SHA256}"
         )
 
+    if rmsnorm_modulate_enabled:
+        for block_index, block in enumerate(blocks):
+            for norm_name in ("norm1", "norm2"):
+                norm = getattr(block, norm_name, None)
+                if not isinstance(norm, torch.nn.RMSNorm):
+                    raise RuntimeError(
+                        f"H3 block {block_index} {norm_name} is {type(norm).__name__}, "
+                        "expected torch.nn.RMSNorm"
+                    )
+                normalized_shape = tuple(norm.normalized_shape)
+                if normalized_shape != (EXPECTED_HIDDEN_SIZE,):
+                    raise RuntimeError(
+                        f"H3 block {block_index} {norm_name} normalized_shape="
+                        f"{normalized_shape}, expected {(EXPECTED_HIDDEN_SIZE,)}"
+                    )
+                if float(norm.eps) != EXPECTED_RMSNORM_EPS:
+                    raise RuntimeError(
+                        f"H3 block {block_index} {norm_name} eps={norm.eps}, "
+                        f"expected {EXPECTED_RMSNORM_EPS}"
+                    )
+                if norm.weight is None or norm.weight.requires_grad:
+                    raise RuntimeError(
+                        f"H3 block {block_index} {norm_name} requires one frozen affine weight"
+                    )
+
     stats = FusedPointwiseStats()
     for block in blocks:
         if hasattr(block, "_h3_original_forward"):
@@ -209,8 +276,20 @@ def install_fused_block_pointwise(
         object.__setattr__(block, "_h3_original_forward", block.forward)
         object.__setattr__(block, "_h3_fused_pointwise_stats", stats)
         object.__setattr__(block, "_h3_fused_pointwise_grad_enabled", bool(grad_enabled))
+        object.__setattr__(
+            block,
+            "_h3_fused_rmsnorm_modulate_enabled",
+            bool(rmsnorm_modulate_enabled),
+        )
         object.__setattr__(block, "forward", types.MethodType(_patched_forward, block))
-    return FusedPointwiseRegistration(True, bool(grad_enabled), source_sha256, len(blocks), stats)
+    return FusedPointwiseRegistration(
+        True,
+        bool(grad_enabled),
+        bool(rmsnorm_modulate_enabled),
+        source_sha256,
+        len(blocks),
+        stats,
+    )
 
 
 def validate_cycle(registration: FusedPointwiseRegistration, start: dict[str, int]) -> dict[str, int]:
@@ -230,6 +309,11 @@ def validate_cycle(registration: FusedPointwiseRegistration, start: dict[str, in
         "fused_grad_residual_calls": 1200 if registration.grad_enabled else 0,
         "fused_grad_modulation_backward_calls": 600 if registration.grad_enabled else 0,
         "fused_grad_residual_backward_calls": 600 if registration.grad_enabled else 0,
+        "fused_nograd_rmsnorm_modulation_calls": (
+            EXPECTED_NOGRAD_RMSNORM_MODULATION_CALLS_PER_CYCLE
+            if registration.rmsnorm_modulate_enabled
+            else 0
+        ),
     }
     errors = [f"{key}={delta[key]} expected={value}" for key, value in expected.items() if delta[key] != value]
     if errors:
