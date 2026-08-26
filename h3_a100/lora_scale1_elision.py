@@ -103,6 +103,17 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
             f"{type(dropout).__name__}"
         )
 
+    # Count path entry before executing tensor operations. Non-reentrant
+    # checkpoint replay may stop by raising PyTorch's internal early-stop
+    # exception from inside a nested module once all required tensors have
+    # been reconstructed, so code after the final operation is not guaranteed
+    # to run even though this scale-one path was selected and executed.
+    stats.elided_calls += 1
+    if torch.is_grad_enabled():
+        stats.grad_elided_calls += 1
+    else:
+        stats.no_grad_elided_calls += 1
+
     result = self.base_layer(x)
     result_dtype = result.dtype
     lora_A = self.lora_A[adapter]
@@ -112,11 +123,6 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
     # Removing only the identity multiplication preserves both GEMMs and the
     # residual add while eliminating one full-output elementwise CUDA kernel.
     result = result + lora_B(lora_A(cast_x))
-    stats.elided_calls += 1
-    if torch.is_grad_enabled():
-        stats.grad_elided_calls += 1
-    else:
-        stats.no_grad_elided_calls += 1
     return result.to(result_dtype)
 
 

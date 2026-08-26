@@ -99,3 +99,25 @@ def test_lora_scale1_elision_rejects_non_identity_scale(monkeypatch):
     with pytest.raises(RuntimeError, match="non-identity scaling"):
         model(torch.randn(2, 32, dtype=torch.bfloat16))
     assert registration.stats.invalid_contract_calls == 1
+
+
+def test_lora_scale1_elision_counts_entry_before_checkpoint_early_stop(monkeypatch):
+    from h3_a100 import lora_scale1_elision as candidate
+
+    monkeypatch.setattr(candidate, "EXPECTED_MODULE_COUNT", 1)
+    model = _make_model().to(dtype=torch.bfloat16)
+    registration = install_lora_scale1_elision(model, enabled=True)
+    linear = next(module for module in model.modules() if type(module).__name__ == "Linear")
+
+    class EarlyStop(BaseException):
+        pass
+
+    def stop(_value):
+        raise EarlyStop
+
+    linear.base_layer.forward = stop
+    with pytest.raises(EarlyStop):
+        model(torch.randn(2, 32, dtype=torch.bfloat16))
+    assert registration.stats.total_calls == 1
+    assert registration.stats.elided_calls == 1
+    assert registration.stats.grad_elided_calls == 1
