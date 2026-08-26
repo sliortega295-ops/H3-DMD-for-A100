@@ -124,6 +124,8 @@ training:
       # No-grad only: fuse FP32 LoRA-B TF32 GEMM, BF16 residual input and BF16
       # output. Grad/replay paths retain the validated scale-one expression.
       fused_nograd_epilogue: false
+      # Default-off custom autograd candidate for grad/replay entries.
+      fused_grad_epilogue: false
     critic_rollout_reorder:
       enabled: true
       group_size: 5

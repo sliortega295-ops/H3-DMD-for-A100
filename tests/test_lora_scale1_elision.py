@@ -27,9 +27,11 @@ def test_lora_scale1_elision_is_default_off_and_fail_closed():
     ).read_text()
     assert '"H3_LORA_SCALE1_ELISION"' in trainer
     assert '"H3_LORA_NOGRAD_EPILOGUE"' in trainer
+    assert '"H3_LORA_GRAD_EPILOGUE"' in trainer
     assert "lora_scale1_elision:" in config
     assert "enabled: false" in config
     assert "fused_nograd_epilogue: false" in config
+    assert "fused_grad_epilogue: false" in config
     assert "PINNED_PEFT_LINEAR_FORWARD_SHA256" in module
     assert "EXPECTED_MODULE_COUNT = 52 * 6" in module
     assert EXPECTED_MODULE_COUNT == 312
@@ -88,6 +90,8 @@ def test_lora_scale1_elision_forward_and_gradients_are_bitwise_equal(monkeypatch
         "unsupported_reference_calls": 0,
         "invalid_contract_calls": 0,
         "fused_nograd_epilogue_calls": 0,
+        "fused_grad_epilogue_calls": 0,
+        "fused_grad_epilogue_backward_calls": 0,
         "reference_grad_epilogue_calls": 0,
     }
 
@@ -130,6 +134,53 @@ def test_lora_nograd_epilogue_requires_scale_one(monkeypatch):
     model = _make_model().to(dtype=torch.bfloat16)
     with pytest.raises(RuntimeError, match="requires scale-one elision"):
         install_lora_scale1_elision(model, enabled=False, epilogue_enabled=True)
+
+
+def test_lora_grad_epilogue_matches_reference_forward_and_backward(monkeypatch):
+    from h3_a100 import lora_scale1_elision as candidate
+
+    monkeypatch.setattr(candidate, "EXPECTED_MODULE_COUNT", 1)
+    reference = _make_model().to(dtype=torch.bfloat16)
+    optimized = copy.deepcopy(reference)
+    registration = install_lora_scale1_elision(
+        optimized,
+        enabled=True,
+        epilogue_enabled=True,
+        grad_epilogue_enabled=True,
+    )
+
+    def fake_epilogue(base, projected, weight):
+        return (base + torch.nn.functional.linear(projected, weight)).to(base.dtype)
+
+    monkeypatch.setattr(candidate, "fused_lora_b_residual", fake_epilogue)
+    x_ref = torch.randn(4, 7, 32, dtype=torch.bfloat16, requires_grad=True)
+    x_opt = x_ref.detach().clone().requires_grad_(True)
+    out_ref = reference(x_ref)
+    out_opt = optimized(x_opt)
+    assert torch.equal(out_ref, out_opt)
+    grad = torch.randn_like(out_ref)
+    out_ref.backward(grad)
+    out_opt.backward(grad)
+    assert torch.equal(x_ref.grad, x_opt.grad)
+    ref_params = dict(reference.named_parameters())
+    opt_params = dict(optimized.named_parameters())
+    for name in ref_params:
+        if ref_params[name].grad is not None:
+            assert torch.equal(ref_params[name].grad, opt_params[name].grad), name
+    assert registration.stats.fused_grad_epilogue_calls == 1
+    assert registration.stats.fused_grad_epilogue_backward_calls == 1
+    assert registration.stats.reference_grad_epilogue_calls == 0
+
+
+def test_lora_grad_epilogue_requires_base_epilogue(monkeypatch):
+    from h3_a100 import lora_scale1_elision as candidate
+
+    monkeypatch.setattr(candidate, "EXPECTED_MODULE_COUNT", 1)
+    model = _make_model().to(dtype=torch.bfloat16)
+    with pytest.raises(RuntimeError, match="requires base LoRA epilogue"):
+        install_lora_scale1_elision(
+            model, enabled=True, epilogue_enabled=False, grad_epilogue_enabled=True
+        )
 
 
 def test_lora_scale1_elision_rejects_non_identity_scale(monkeypatch):

@@ -22,6 +22,7 @@ EXPECTED_TOTAL_CALLS_PER_CYCLE = EXPECTED_MODULE_COUNT * 37
 EXPECTED_DISABLED_CALLS_PER_CYCLE = EXPECTED_MODULE_COUNT
 EXPECTED_NOGRAD_ELISIONS_PER_CYCLE = EXPECTED_MODULE_COUNT * 24
 EXPECTED_GRAD_ELISIONS_PER_CYCLE = EXPECTED_MODULE_COUNT * 12
+EXPECTED_GRAD_BACKWARDS_PER_CYCLE = EXPECTED_MODULE_COUNT * 6
 
 
 @dataclasses.dataclass
@@ -34,6 +35,8 @@ class LoRAScale1Stats:
     unsupported_reference_calls: int = 0
     invalid_contract_calls: int = 0
     fused_nograd_epilogue_calls: int = 0
+    fused_grad_epilogue_calls: int = 0
+    fused_grad_epilogue_backward_calls: int = 0
     reference_grad_epilogue_calls: int = 0
 
 
@@ -41,6 +44,7 @@ class LoRAScale1Stats:
 class LoRAScale1Registration:
     enabled: bool
     epilogue_enabled: bool
+    grad_epilogue_enabled: bool
     source_sha256: str | None
     module_count: int
     stats: LoRAScale1Stats
@@ -52,6 +56,7 @@ class LoRAScale1Registration:
         return {
             "enabled": self.enabled,
             "epilogue_enabled": self.epilogue_enabled,
+            "grad_epilogue_enabled": self.grad_epilogue_enabled,
             "source_sha256": self.source_sha256,
             "module_count": self.module_count,
             "stats": self.snapshot(),
@@ -64,6 +69,31 @@ def _source_sha256(function: Callable[..., Any]) -> str:
 
 def _scale_is_exact_one(value: Any) -> bool:
     return isinstance(value, (int, float)) and float(value) == 1.0
+
+
+class _FusedLoRABResidualAutograd(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, base, projected, weight, stats):
+        ctx.save_for_backward(projected, weight)
+        ctx.stats = stats
+        return fused_lora_b_residual(base, projected, weight)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        projected, weight = ctx.saved_tensors
+        ctx.stats.fused_grad_epilogue_backward_calls += 1
+        columns = int(weight.shape[0])
+        rows = int(grad_output.numel() // columns)
+        grad_2d = grad_output.reshape(rows, columns)
+        projected_2d = projected.reshape(rows, int(weight.shape[1]))
+        grad_projected = torch.mm(grad_2d, weight)
+        grad_weight = torch.mm(grad_2d.transpose(0, 1), projected_2d)
+        return (
+            grad_output,
+            grad_projected.reshape(projected.shape),
+            grad_weight,
+            None,
+        )
 
 
 def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor:
@@ -122,7 +152,10 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
         stats.no_grad_elided_calls += 1
     if self._h3_lora_epilogue_enabled:
         if grad_enabled:
-            stats.reference_grad_epilogue_calls += 1
+            if self._h3_lora_grad_epilogue_enabled:
+                stats.fused_grad_epilogue_calls += 1
+            else:
+                stats.reference_grad_epilogue_calls += 1
         else:
             stats.fused_nograd_epilogue_calls += 1
 
@@ -131,7 +164,9 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
     lora_A = self.lora_A[adapter]
     lora_B = self.lora_B[adapter]
     cast_x = self._cast_input_dtype(x, lora_A.weight.dtype)
-    if self._h3_lora_epilogue_enabled and not grad_enabled:
+    if self._h3_lora_epilogue_enabled and (
+        not grad_enabled or self._h3_lora_grad_epilogue_enabled
+    ):
         if (
             lora_B.bias is not None
             or lora_B._forward_pre_hooks
@@ -142,6 +177,10 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
                 "H3 LoRA epilogue requires a hook-free bias-free LoRA-B Linear"
             )
         projected = lora_A(cast_x)
+        if grad_enabled:
+            return _FusedLoRABResidualAutograd.apply(
+                result, projected, lora_B.weight, stats
+            ).to(result_dtype)
         return fused_lora_b_residual(result, projected, lora_B.weight).to(result_dtype)
 
     # PEFT's pinned expression is `result + lora_B(lora_A(x)) * 1.0`.
@@ -152,14 +191,22 @@ def _patched_forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.
 
 
 def install_lora_scale1_elision(
-    transformer: torch.nn.Module, *, enabled: bool, epilogue_enabled: bool = False
+    transformer: torch.nn.Module,
+    *,
+    enabled: bool,
+    epilogue_enabled: bool = False,
+    grad_epilogue_enabled: bool = False,
 ) -> LoRAScale1Registration:
     """Patch the pinned PEFT Linear modules after both adapters are injected."""
 
     if not enabled:
-        if epilogue_enabled:
+        if epilogue_enabled or grad_epilogue_enabled:
             raise RuntimeError("H3 LoRA epilogue requires scale-one elision")
-        return LoRAScale1Registration(False, False, None, 0, LoRAScale1Stats())
+        return LoRAScale1Registration(
+            False, False, False, None, 0, LoRAScale1Stats()
+        )
+    if grad_epilogue_enabled and not epilogue_enabled:
+        raise RuntimeError("H3 grad LoRA epilogue requires base LoRA epilogue enabled")
 
     from peft.tuners.lora.layer import Linear
 
@@ -184,8 +231,18 @@ def install_lora_scale1_elision(
         object.__setattr__(module, "_h3_original_lora_forward", module.forward)
         object.__setattr__(module, "_h3_lora_scale1_stats", stats)
         object.__setattr__(module, "_h3_lora_epilogue_enabled", epilogue_enabled)
+        object.__setattr__(
+            module, "_h3_lora_grad_epilogue_enabled", grad_epilogue_enabled
+        )
         object.__setattr__(module, "forward", types.MethodType(_patched_forward, module))
-    return LoRAScale1Registration(True, epilogue_enabled, source_sha256, len(modules), stats)
+    return LoRAScale1Registration(
+        True,
+        epilogue_enabled,
+        grad_epilogue_enabled,
+        source_sha256,
+        len(modules),
+        stats,
+    )
 
 
 def validate_cycle(
@@ -208,8 +265,20 @@ def validate_cycle(
         "fused_nograd_epilogue_calls": (
             EXPECTED_NOGRAD_ELISIONS_PER_CYCLE if registration.epilogue_enabled else 0
         ),
+        "fused_grad_epilogue_calls": (
+            EXPECTED_GRAD_ELISIONS_PER_CYCLE
+            if registration.grad_epilogue_enabled
+            else 0
+        ),
+        "fused_grad_epilogue_backward_calls": (
+            EXPECTED_GRAD_BACKWARDS_PER_CYCLE
+            if registration.grad_epilogue_enabled
+            else 0
+        ),
         "reference_grad_epilogue_calls": (
-            EXPECTED_GRAD_ELISIONS_PER_CYCLE if registration.epilogue_enabled else 0
+            EXPECTED_GRAD_ELISIONS_PER_CYCLE
+            if registration.epilogue_enabled and not registration.grad_epilogue_enabled
+            else 0
         ),
     }
     errors = [

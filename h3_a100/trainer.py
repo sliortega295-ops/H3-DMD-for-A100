@@ -266,6 +266,17 @@ class MiniMaxH3A100DmdTrainer(
         )
         if self.lora_nograd_epilogue_enabled and not self.lora_scale1_elision_enabled:
             raise ValueError("H3_LORA_NOGRAD_EPILOGUE requires H3_LORA_SCALE1_ELISION=1")
+        lora_grad_epilogue_value = os.environ.get(
+            "H3_LORA_GRAD_EPILOGUE",
+            lora_scale1.get("fused_grad_epilogue", False),
+        )
+        self.lora_grad_epilogue_enabled = (
+            lora_grad_epilogue_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(lora_grad_epilogue_value, str)
+            else bool(lora_grad_epilogue_value)
+        )
+        if self.lora_grad_epilogue_enabled and not self.lora_nograd_epilogue_enabled:
+            raise ValueError("H3_LORA_GRAD_EPILOGUE requires H3_LORA_NOGRAD_EPILOGUE=1")
         self.lora_scale1_elision_registration = None
 
         self.activation_offload_enabled = os.environ.get(
@@ -359,6 +370,7 @@ class MiniMaxH3A100DmdTrainer(
             model.denoiser_module(),
             enabled=self.lora_scale1_elision_enabled,
             epilogue_enabled=self.lora_nograd_epilogue_enabled,
+            grad_epilogue_enabled=self.lora_grad_epilogue_enabled,
         )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
@@ -472,7 +484,7 @@ class MiniMaxH3A100DmdTrainer(
             "fused_qk_rmsnorm_rotary={} fused_qk_rmsnorm_rotary_grad={} "
             "fused_swiglu={} fused_swiglu_grad={} "
             "fa3_nograd_num_splits={} lora_scale1_elision={} "
-            "lora_nograd_epilogue={}",
+            "lora_nograd_epilogue={} lora_grad_epilogue={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
@@ -488,6 +500,7 @@ class MiniMaxH3A100DmdTrainer(
             self.fa3_nograd_num_splits,
             self.lora_scale1_elision_enabled,
             self.lora_nograd_epilogue_enabled,
+            self.lora_grad_epilogue_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:
