@@ -23,6 +23,7 @@ from .fused_block_pointwise import install_fused_block_pointwise
 from .fused_rotary import install_fused_rotary
 from .fused_swiglu import install_fused_swiglu
 from .fa3_nograd_splits import install_fa3_nograd_splits
+from .lora_scale1_elision import install_lora_scale1_elision
 from .matched_contract import FIXED_END_STEP_IDX, MatchedCycleCensus
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER, MiniMaxH3A100Model
 from .trainer_loop import H3A100LoopMixin
@@ -58,6 +59,7 @@ class MiniMaxH3A100DmdTrainer(
         rotary_fusion = a100.get("rotary_fusion", {})
         swiglu_fusion = a100.get("swiglu_fusion", {})
         fa3_splits = a100.get("fa3_nograd_splits", {})
+        lora_scale1 = a100.get("lora_scale1_elision", {})
 
         self.adaln_cache_enabled = bool(cache.get("enabled", True))
         self.adaln_dynamic_keys = int(cache.get("max_dynamic_keys", 2))
@@ -193,6 +195,16 @@ class MiniMaxH3A100DmdTrainer(
                 f"got {self.fa3_nograd_num_splits}"
             )
         self.fa3_nograd_split_registration = None
+        lora_scale1_value = os.environ.get(
+            "H3_LORA_SCALE1_ELISION",
+            lora_scale1.get("enabled", False),
+        )
+        self.lora_scale1_elision_enabled = (
+            lora_scale1_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(lora_scale1_value, str)
+            else bool(lora_scale1_value)
+        )
+        self.lora_scale1_elision_registration = None
 
         self.activation_offload_enabled = os.environ.get(
             "H3_ACTIVATION_OFFLOAD", "0"
@@ -271,6 +283,10 @@ class MiniMaxH3A100DmdTrainer(
         self.fa3_nograd_split_registration = install_fa3_nograd_splits(
             num_splits=self.fa3_nograd_num_splits,
         )
+        self.lora_scale1_elision_registration = install_lora_scale1_elision(
+            model.denoiser_module(),
+            enabled=self.lora_scale1_elision_enabled,
+        )
         self._validate_reorder_contract()
         if resume_ckpt_path is not None:
             self._load_role_weights_before_fsdp(resume_ckpt_path)
@@ -339,7 +355,7 @@ class MiniMaxH3A100DmdTrainer(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
             "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
             "fused_block_pointwise_grad={} fused_swiglu={} fused_swiglu_grad={} "
-            "fa3_nograd_num_splits={}",
+            "fa3_nograd_num_splits={} lora_scale1_elision={}",
             self.activation_policy,
             self.activation_checkpoint_segment_size,
             self.boundary_offload_pin_memory,
@@ -350,6 +366,7 @@ class MiniMaxH3A100DmdTrainer(
             self.fused_swiglu_enabled,
             self.fused_swiglu_grad_enabled,
             self.fa3_nograd_num_splits,
+            self.lora_scale1_elision_enabled,
         )
 
     def _install_residency_block_hooks(self) -> None:
