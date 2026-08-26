@@ -1,0 +1,13 @@
+{
+  "run_id": "iteration_397_lora_epilogue_local_refine_20260826",
+  "status": "COMPLETE_NO_GO_WORLD16",
+  "baseline": "m64n128k32w8s3g8",
+  "winner": "m64n128k32w4s4g8",
+  "projected_incremental_savings_seconds_per_gpu_cycle": 0.5916673064,
+  "go_threshold_seconds": 1.0,
+  "bitwise_equal_all_shapes": true,
+  "source_change": "NOT_IMPLEMENTED",
+  "world16": "NOT_RUN_THRESHOLD_NOT_MET",
+  "claim_boundary": "One-GPU kernel microbenchmark only; no training speedup claim."
+}
+

@@ -1,0 +1,15 @@
+{
+  "run_id": "iteration_398_fa3_split3_canary_20260826",
+  "status": "COMPLETE_NO_GO_WORLD16",
+  "shape": [1, 37760, 56, 128],
+  "dtype": "torch.bfloat16",
+  "baseline_num_splits": 2,
+  "candidate_num_splits": 3,
+  "parity_status": "PASS",
+  "projected_forward_savings_seconds_per_gpu_cycle": -2.5555679932,
+  "split2_peak_allocated_gib": 6.1328125,
+  "split3_peak_allocated_gib": 8.14990234375,
+  "source_change": "NOT_IMPLEMENTED",
+  "world16": "NOT_RUN_CANDIDATE_SLOWER_AND_HIGHER_HBM",
+  "claim_boundary": "One-GPU real-kernel canary only; no training speedup claim."
+}
