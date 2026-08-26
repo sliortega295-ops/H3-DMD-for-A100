@@ -1,0 +1,52 @@
+{
+  "status": "PASS_PROVISIONAL_SINGLE_RUN",
+  "feature": "grad_qk_rmsnorm_exact_rotary_fusion",
+  "parent": {
+    "run_id": "iteration_383_qk_rmsnorm_rotary_world16_r2_20260826",
+    "head": "0f596ca82f4e547b3046f1ccf251f82ae9d3c662",
+    "seconds": 823.037
+  },
+  "candidate": {
+    "run_id": "iteration_386_qk_rmsnorm_rotary_grad_world16_20260826",
+    "head": "b5c8aa3c41e4eecce2aad86140f5be17af8b2ff1",
+    "implementation_head": "4485af716b1239509aac0a1a19a291fcdd457393",
+    "seconds": 820.008,
+    "delta_seconds": -3.029,
+    "relative_change_percent": -0.3680271968331872,
+    "speedup": 1.0036938664013033,
+    "trials": 1,
+    "profiled": false
+  },
+  "production_shape_canary": {
+    "shape": [1, 37760, 56, 128],
+    "dtype": "torch.bfloat16",
+    "reference_median_ms": 22.181888580322266,
+    "candidate_median_ms": 4.16153621673584,
+    "output_normalized_l2": 1.0092011275616184e-05,
+    "gradient_normalized_l2": 1.0557210547884072e-05
+  },
+  "two_rank_fsdp2_canary": "PASS",
+  "workload": {
+    "world_size": 16,
+    "application_forwards": {"student": 24, "fake": 6, "teacher": 1},
+    "grad_forwards": {"student": 1, "fake": 5, "teacher": 0},
+    "backwards": {"student": 1, "fake": 5},
+    "sample_identity_count": 96,
+    "grid_replay": {"wraps": 300, "scopes": 600, "hits": 600, "misses": 0}
+  },
+  "feature_census_per_rank": {
+    "fused_nograd_attention_calls": 1250,
+    "fused_nograd_qk_calls": 2500,
+    "fused_grad_attention_calls": 600,
+    "fused_grad_qk_calls": 1200,
+    "fused_grad_qk_backward_calls": 600,
+    "reference_grad_attention_calls": 0
+  },
+  "memory": {
+    "rank0_peak_allocated_gib": 34.77,
+    "rank0_end_reserved_gib": 36.65,
+    "cuda_oom_delta": 0,
+    "cgroup_oom_delta": 0
+  },
+  "claim_boundary": "One unprofiled matched run; provisional mechanism validation, not a variance-qualified speedup."
+}
