@@ -24,3 +24,6 @@ def test_lora_epilogue_contract_is_fixed_and_grad_path_is_opt_in():
     assert "reference_grad_epilogue_calls" in forward
     assert "warmup_lora_epilogue" in trainer
     assert '"epilogue_block_n": LORA_EPILOGUE_BLOCK_N' in forward
+    assert '"epilogue={} epilogue_block_n={} delta={}"' in (
+        ROOT / "h3_a100" / "trainer_loop.py"
+    ).read_text()
