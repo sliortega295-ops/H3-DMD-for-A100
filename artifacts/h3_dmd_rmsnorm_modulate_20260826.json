@@ -1,0 +1,113 @@
+{
+  "canaries": {
+    "focused_tests": {
+      "node0": "12 passed",
+      "node1": "12 passed"
+    },
+    "fsdp2_world2_status": "PASS",
+    "status": "PASS"
+  },
+  "mechanism": "no-grad fused RMSNorm + exact BF16 modulation",
+  "micro": {
+    "candidate_median_ms": 0.6425600051879883,
+    "candidate_ms": [
+      0.6440960168838501,
+      5.489664077758789,
+      0.6440960168838501,
+      0.6481919884681702,
+      0.6430720090866089,
+      0.6410239934921265,
+      0.6420480012893677,
+      0.6420480012893677,
+      0.6420480012893677,
+      0.6410239934921265
+    ],
+    "device": "NVIDIA A100-SXM4-40GB",
+    "dtype": "BF16",
+    "paired_median_delta_ms": -1.1284480094909668,
+    "parity": {
+      "bitwise_equal": false,
+      "cosine": 0.9999999999425732,
+      "finite": true,
+      "max_abs": 0.03125,
+      "normalized_l2": 1.071697206954837e-05
+    },
+    "reference_median_ms": 1.7720320224761963,
+    "reference_ms": [
+      1.7756160497665405,
+      3.234816074371338,
+      1.7745920419692993,
+      1.7694720029830933,
+      1.7663999795913696,
+      1.772544026374817,
+      1.7653759717941284,
+      1.7715200185775757,
+      1.7694720029830933,
+      1.7756160497665405
+    ],
+    "shape": [
+      1,
+      37760,
+      5376
+    ],
+    "status": "PASS_DIAGNOSTIC",
+    "torch": "2.10.0+cu128",
+    "world16": "NOT_RUN"
+  },
+  "persistent_evidence_root": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100",
+  "schema_version": 1,
+  "world16": {
+    "application_census": {
+      "fake_backward": 5,
+      "fake_forward": 6,
+      "fake_grad_forward": 5,
+      "student_backward": 1,
+      "student_forward": 24,
+      "student_grad_forward": 1,
+      "teacher_forward": 1,
+      "teacher_grad_forward": 0
+    },
+    "candidate_seconds": 825.947,
+    "claim_boundary": "One unprofiled run. Improvement is provisional, not a median or variance-qualified speed claim.",
+    "cleanup": "PASS_16_GPUS_IDLE_ALL_LOCKS_FREE",
+    "delta_seconds": -2.4080000000000155,
+    "evidence_lines": {
+      "matched": "2026-08-26 09:17:03.761 | INFO | rank=0 | h3_a100.trainer_loop:_validate_matched_cycle:447 - [h3-a100][matched] iter=0 rank=0 forwards={'student': 24, 'fake': 6, 'teacher': 1} grad_forwards={'student': 1, 'fake': 5, 'teacher': 0} backwards={'student': 1, 'fake': 5} samples=6 world=16",
+      "memory": "2026-08-26 09:17:03.775 | INFO | rank=0 | h3_a100.trainer_loop:_log_cuda_memory:485 - [h3-a100][memory] stage=iter_1 allocated_gib=2.92 reserved_gib=36.65 peak_gib=34.79",
+      "pointwise": "2026-08-26 09:17:03.768 | INFO | rank=0 | h3_a100.trainer_loop:_validate_fused_pointwise_cycle:307 - [h3-a100][fused-pointwise] iter=0 rank=0 source_sha=ca6d9ca44871d0ed10fceaa4eecd184a7ac907cbd3e3b8fd9f761b91598a944d delta={'fused_nograd_block_calls': 1250, 'fused_grad_block_calls': 600, 'reference_grad_block_calls': 0, 'fused_modulation_calls': 2500, 'fused_residual_calls': 2500, 'fused_grad_modulation_calls': 1200, 'fused_grad_residual_calls': 1200, 'fused_grad_modulation_backward_calls': 600, 'fused_grad_residual_backward_calls': 600, 'fused_nograd_rmsnorm_modulation_calls': 2500}"
+    },
+    "grid_replay": {
+      "cache_hit_count": 600,
+      "cache_miss_count": 0,
+      "checkpoint_wrap_count": 300,
+      "scoped_execution_count": 600
+    },
+    "node_exits": {
+      "node0": 0,
+      "node1": 0
+    },
+    "oom_delta": {
+      "node0": 0,
+      "node1": 0
+    },
+    "parent_run": "iteration_376_lora_bf16_epilogue_world16_20260826",
+    "parent_seconds": 828.355,
+    "peak_allocated_gib_rank0": 34.79,
+    "profiled": false,
+    "relative_change_percent": -0.29069662161754506,
+    "reserved_gib_rank0_end": 36.65,
+    "rmsnorm_modulate_calls_per_rank": 2500,
+    "run_id": "iteration_379_rmsnorm_modulate_world16_20260826",
+    "sample_identity_count_world": 96,
+    "source_head": "7a9e0e3da0eb477a22e29287a7b618b50e260f6f",
+    "speedup": 1.0029154413055559,
+    "status": "PASS_PROVISIONAL_SINGLE_RUN",
+    "timing_boundary": {
+      "definition": "rank0 train-start to post-world16 matched all_gather receipt",
+      "start": "2026-08-26 09:03:17.814",
+      "stop": "2026-08-26 09:17:03.761"
+    },
+    "trials": 1,
+    "world_size": 16
+  }
+}
