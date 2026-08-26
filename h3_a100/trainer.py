@@ -191,6 +191,27 @@ class MiniMaxH3A100DmdTrainer(
             raise ValueError(
                 "H3_FUSED_QK_RMSNORM_ROTARY requires H3_FUSED_ROTARY=1"
             )
+        fused_qk_grad_value = os.environ.get(
+            "H3_FUSED_QK_RMSNORM_ROTARY_GRAD",
+            rotary_fusion.get("qk_rmsnorm_grad", False),
+        )
+        self.fused_qk_rmsnorm_rotary_grad_enabled = (
+            fused_qk_grad_value.lower() in {"1", "true", "yes", "on"}
+            if isinstance(fused_qk_grad_value, str)
+            else bool(fused_qk_grad_value)
+        )
+        if (
+            self.fused_qk_rmsnorm_rotary_grad_enabled
+            and not self.fused_qk_rmsnorm_rotary_enabled
+        ):
+            raise ValueError(
+                "H3_FUSED_QK_RMSNORM_ROTARY_GRAD requires "
+                "H3_FUSED_QK_RMSNORM_ROTARY=1"
+            )
+        if self.fused_qk_rmsnorm_rotary_grad_enabled and not self.fused_rotary_grad_enabled:
+            raise ValueError(
+                "H3_FUSED_QK_RMSNORM_ROTARY_GRAD requires H3_FUSED_ROTARY_GRAD=1"
+            )
         self.fused_qk_rmsnorm_rotary_registration = None
         swiglu_value = os.environ.get(
             "H3_FUSED_SWIGLU",
@@ -323,6 +344,7 @@ class MiniMaxH3A100DmdTrainer(
         self.fused_qk_rmsnorm_rotary_registration = install_fused_qk_rmsnorm_rotary(
             model.denoiser_module(),
             enabled=self.fused_qk_rmsnorm_rotary_enabled,
+            grad_enabled=self.fused_qk_rmsnorm_rotary_grad_enabled,
             base_rotary_registration=self.fused_rotary_registration,
         )
         self.fused_swiglu_registration = install_fused_swiglu(
@@ -371,13 +393,20 @@ class MiniMaxH3A100DmdTrainer(
                 dist.barrier()
 
         if self.fused_qk_rmsnorm_rotary_enabled:
-            from .triton_fused_rotary import warmup_fused_qk_rmsnorm_rotary
+            from .triton_fused_rotary import (
+                warmup_fused_qk_rmsnorm_rotary,
+                warmup_fused_qk_rmsnorm_rotary_backward,
+            )
 
             if int(os.environ.get("LOCAL_RANK", 0)) == 0:
                 warmup_fused_qk_rmsnorm_rotary(torch.cuda.current_device())
+                if self.fused_qk_rmsnorm_rotary_grad_enabled:
+                    warmup_fused_qk_rmsnorm_rotary_backward(torch.cuda.current_device())
             if dist.is_initialized():
                 dist.barrier()
             warmup_fused_qk_rmsnorm_rotary(torch.cuda.current_device())
+            if self.fused_qk_rmsnorm_rotary_grad_enabled:
+                warmup_fused_qk_rmsnorm_rotary_backward(torch.cuda.current_device())
             if dist.is_initialized():
                 dist.barrier()
 
@@ -440,7 +469,7 @@ class MiniMaxH3A100DmdTrainer(
             "[h3-a100] activation policy={} checkpoint_segment={} boundary_pin={} "
             "boundary_events={} legacy_threshold_offload={} fused_block_pointwise={} "
             "fused_block_pointwise_grad={} fused_rmsnorm_modulate={} "
-            "fused_qk_rmsnorm_rotary={} "
+            "fused_qk_rmsnorm_rotary={} fused_qk_rmsnorm_rotary_grad={} "
             "fused_swiglu={} fused_swiglu_grad={} "
             "fa3_nograd_num_splits={} lora_scale1_elision={} "
             "lora_nograd_epilogue={}",
@@ -453,6 +482,7 @@ class MiniMaxH3A100DmdTrainer(
             self.fused_block_pointwise_grad_enabled,
             self.fused_rmsnorm_modulate_enabled,
             self.fused_qk_rmsnorm_rotary_enabled,
+            self.fused_qk_rmsnorm_rotary_grad_enabled,
             self.fused_swiglu_enabled,
             self.fused_swiglu_grad_enabled,
             self.fa3_nograd_num_splits,

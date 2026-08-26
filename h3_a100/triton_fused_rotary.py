@@ -201,6 +201,71 @@ def _qk_rmsnorm_rotary_kernel(
     tl.store(output + row_base + columns, result, mask=mask)
 
 
+@triton.jit
+def _qk_rmsnorm_rotary_backward_kernel(
+    grad_output,
+    hidden_states,
+    weight,
+    cosine,
+    sine,
+    grad_input,
+    num_heads: tl.constexpr,
+    head_dim: tl.constexpr,
+    rotary_dim: tl.constexpr,
+    eps: tl.constexpr,
+    block_size: tl.constexpr,
+):
+    """Fuse exact rotary backward with frozen-affine RMSNorm backward."""
+
+    row = tl.program_id(0)
+    columns = tl.arange(0, block_size)
+    mask = columns < head_dim
+    row_base = row * head_dim
+
+    direct_grad = tl.load(grad_output + row_base + columns, mask=mask, other=0.0).to(
+        tl.bfloat16
+    )
+    half = rotary_dim // 2
+    rotary_mask = columns < rotary_dim
+    paired_columns = tl.where(columns < half, columns + half, columns - half)
+    paired_grad = tl.load(
+        grad_output + row_base + paired_columns,
+        mask=rotary_mask,
+        other=0.0,
+    ).to(tl.bfloat16)
+    sequence_row = row // num_heads
+    direct_table = sequence_row * rotary_dim + columns
+    paired_table = sequence_row * rotary_dim + paired_columns
+    cos_values = tl.load(cosine + direct_table, mask=rotary_mask, other=0.0).to(
+        tl.bfloat16
+    )
+    sin_values = tl.load(sine + paired_table, mask=rotary_mask, other=0.0).to(
+        tl.bfloat16
+    )
+    signed_paired_grad = tl.where(columns < half, paired_grad, -paired_grad).to(
+        tl.bfloat16
+    )
+    grad_normalized = _bf16_rotary_exact(
+        direct_grad,
+        signed_paired_grad,
+        cos_values,
+        sin_values,
+    )
+    grad_normalized = tl.where(rotary_mask, grad_normalized, direct_grad).to(tl.float32)
+
+    values = tl.load(hidden_states + row_base + columns, mask=mask, other=0.0).to(
+        tl.float32
+    )
+    weights = tl.load(weight + columns, mask=mask, other=0.0).to(tl.float32)
+    inverse_rms = tl.rsqrt(tl.sum(values * values, axis=0) / head_dim + eps)
+    weighted_grad = grad_normalized * weights
+    projection = tl.sum(weighted_grad * values, axis=0) / head_dim
+    result = inverse_rms * (
+        weighted_grad - values * (inverse_rms * inverse_rms) * projection
+    )
+    tl.store(grad_input + row_base + columns, result, mask=mask)
+
+
 def fused_apply_rotary_emb(
     hidden_states: torch.Tensor,
     cos: torch.Tensor,
@@ -333,6 +398,72 @@ def fused_qk_rmsnorm_rotary(
     return output
 
 
+def fused_qk_rmsnorm_rotary_backward(
+    grad_output: torch.Tensor,
+    hidden_states: torch.Tensor,
+    weight: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor,
+    *,
+    eps: float,
+) -> torch.Tensor:
+    """Return the input gradient for the frozen Q/K RMSNorm+rotary chain."""
+
+    if not grad_output.is_cuda or grad_output.dtype != torch.bfloat16:
+        raise RuntimeError("H3 fused Q/K backward requires CUDA BF16 grad_output")
+    if grad_output.shape != hidden_states.shape:
+        raise RuntimeError(
+            "H3 fused Q/K backward shape mismatch "
+            f"grad={tuple(grad_output.shape)} hidden={tuple(hidden_states.shape)}"
+        )
+    if not grad_output.is_contiguous():
+        raise RuntimeError("H3 fused Q/K backward requires contiguous grad_output")
+    if hidden_states.dtype != torch.bfloat16 or weight.dtype != torch.bfloat16:
+        raise RuntimeError(
+            "H3 fused Q/K backward requires BF16 hidden/weight, got "
+            f"{hidden_states.dtype}/{weight.dtype}"
+        )
+    batch, sequence_length, num_heads, head_dim = map(int, hidden_states.shape)
+    if (batch, num_heads, head_dim) != (1, 56, 128):
+        raise RuntimeError(
+            "H3 fused Q/K backward is preregistered for B1/NH56/HD128, got "
+            f"B{batch}/NH{num_heads}/HD{head_dim}"
+        )
+    if float(eps) != 1e-5:
+        raise RuntimeError(f"H3 fused Q/K backward requires eps=1e-5, got {eps}")
+    if weight.numel() != head_dim or cos.shape != sin.shape:
+        raise RuntimeError("H3 fused Q/K backward weight or rotary table mismatch")
+    rotary_dim = int(cos.shape[1])
+    if int(cos.shape[0]) != sequence_length or rotary_dim != 96:
+        raise RuntimeError(
+            "H3 fused Q/K backward requires cos/sin=[S,96], got "
+            f"{tuple(cos.shape)}/{tuple(sin.shape)}"
+        )
+    tensors = (grad_output, hidden_states, weight, cos, sin)
+    if any(tensor.device != hidden_states.device for tensor in tensors):
+        raise RuntimeError("H3 fused Q/K backward operands must share one device")
+    if any(not tensor.is_contiguous() for tensor in tensors):
+        raise RuntimeError("H3 fused Q/K backward requires contiguous operands")
+
+    grad_input = torch.empty_like(hidden_states)
+    _qk_rmsnorm_rotary_backward_kernel[(sequence_length * num_heads,)](
+        grad_output,
+        hidden_states,
+        weight,
+        cos,
+        sin,
+        grad_input,
+        num_heads=num_heads,
+        head_dim=head_dim,
+        rotary_dim=rotary_dim,
+        eps=float(eps),
+        block_size=128,
+        num_warps=2,
+        num_stages=1,
+    )
+    return grad_input
+
+
 @torch.no_grad()
 def warmup_fused_qk_rmsnorm_rotary(device: torch.device | int) -> None:
     hidden = torch.zeros((1, 1, 56, 128), device=device, dtype=torch.bfloat16)
@@ -340,6 +471,19 @@ def warmup_fused_qk_rmsnorm_rotary(device: torch.device | int) -> None:
     cos = torch.ones((1, 96), device=device, dtype=torch.float32)
     sin = torch.zeros_like(cos)
     fused_qk_rmsnorm_rotary(hidden, weight, cos, sin, eps=1e-5)
+    torch.cuda.synchronize(device)
+
+
+@torch.no_grad()
+def warmup_fused_qk_rmsnorm_rotary_backward(device: torch.device | int) -> None:
+    hidden = torch.zeros((1, 1, 56, 128), device=device, dtype=torch.bfloat16)
+    grad = torch.zeros_like(hidden)
+    weight = torch.ones((128,), device=device, dtype=torch.bfloat16)
+    cos = torch.ones((1, 96), device=device, dtype=torch.float32)
+    sin = torch.zeros_like(cos)
+    fused_qk_rmsnorm_rotary_backward(
+        grad, hidden, weight, cos, sin, eps=1e-5
+    )
     torch.cuda.synchronize(device)
 
 
