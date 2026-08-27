@@ -16,9 +16,11 @@ boundaries, FSDP placement, or application-level call counts.
 from __future__ import annotations
 
 import contextvars
+import concurrent.futures
 import dataclasses
 import functools
 import math
+import threading
 from collections import defaultdict, deque
 from collections.abc import Callable, Iterable
 from typing import Any
@@ -33,11 +35,12 @@ EXPECTED_BLOCK_COUNT = 50
 EXPECTED_GRAD_TRANSFORMER_FORWARDS = 6
 EXPECTED_HEADS = 56
 EXPECTED_HEAD_DIM = 128
+EXPECTED_SEQUENCE = 37_760
 COMPACT_FORWARD_SCHEMA = (
     "h3_a100::fa3_forward_compact(Tensor q, Tensor k, Tensor v, "
     "float softmax_scale) -> (Tensor, Tensor)"
 )
-SUPPORTED_STORAGE = ("cuda", "cpu")
+SUPPORTED_STORAGE = ("cuda", "cpu", "cpu_staged")
 
 
 @dataclasses.dataclass
@@ -61,6 +64,13 @@ class FA3ReplayCacheStats:
     cpu_pool_busy_waits: int = 0
     cpu_pool_busy_misses: int = 0
     cpu_d2h_backpressure_waits: int = 0
+    cpu_stage_allocated_bytes: int = 0
+    cpu_forward_host_copy_entries: int = 0
+    cpu_forward_host_copy_bytes: int = 0
+    cpu_backward_host_copy_entries: int = 0
+    cpu_backward_host_copy_bytes: int = 0
+    cpu_backward_prefetches: int = 0
+    cpu_backward_prefetch_misses: int = 0
     allocator_trim_calls: int = 0
     unexpected_cpu_storage_calls: int = 0
     unexpected_kernel_contract_calls: int = 0
@@ -72,11 +82,15 @@ class _Runtime:
     raw_forward: Callable[..., Any]
     raw_backward: Callable[..., Any]
     stats: FA3ReplayCacheStats
+    staged_pool: "_PageableStagingPool | None" = None
 
 
 _RUNTIME: _Runtime | None = None
 _CACHE_ACTIVE: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "h3_a100_fa3_replay_cache_active", default=False
+)
+_CACHE_BLOCK_INDEX: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "h3_a100_fa3_replay_cache_block_index", default=-1
 )
 
 
@@ -153,6 +167,7 @@ class _CompactFA3Autograd(torch.autograd.Function):
         out, softmax_lse = _fa3_forward_compact(q, k, v, float(scale))
         ctx.save_for_backward(q, k, v, out, softmax_lse)
         ctx.scale = float(scale)
+        ctx.block_index = int(_CACHE_BLOCK_INDEX.get())
         return out
 
     @staticmethod
@@ -187,6 +202,8 @@ class _CompactFA3Autograd(torch.autograd.Function):
             0,
         )
         runtime.stats.compact_backward_calls += 1
+        if runtime.staged_pool is not None:
+            runtime.staged_pool.prefetch_after_backward(int(ctx.block_index))
         return dq, dk, dv, None
 
 
@@ -397,6 +414,302 @@ def _create_cpu_cache_contexts(
 
 
 @dataclasses.dataclass
+class _PageableBuffer:
+    tensor: torch.Tensor
+    reusable_after: torch.cuda.Event | None = None
+
+
+@dataclasses.dataclass
+class _StagePair:
+    tensors: tuple[torch.Tensor, torch.Tensor]
+    in_use: bool = False
+
+
+@dataclasses.dataclass
+class _PageableCacheEntry:
+    block_index: int
+    pages: tuple[_PageableBuffer, _PageableBuffer]
+    forward_future: concurrent.futures.Future[Any]
+    device: torch.device
+    backward_future: concurrent.futures.Future[Any] | None = None
+
+
+class _PageableStagingPool:
+    """Pageable cache reservoir with a bounded reusable pinned staging window.
+
+    The 50-block raw pinned reservoir was rejected by a real cgroup OOM.  This
+    pool keeps the long-lived exact out/LSE values in ordinary host memory and
+    uses at most ``max_d2h_inflight`` pinned pairs for physical CUDA transfers.
+    Host memcpy is issued by one process-local worker and is overlapped with
+    the intervening block compute.  Before backward, the next block is copied
+    into a pinned pair, but its GPU allocation/H2D remains demand-driven so the
+    candidate does not add a second 0.51-GiB GPU cache entry.
+    """
+
+    _OUT_SHAPE = (1, EXPECTED_SEQUENCE, EXPECTED_HEADS, EXPECTED_HEAD_DIM)
+    _LSE_SHAPE = (1, EXPECTED_HEADS, EXPECTED_SEQUENCE)
+
+    def __init__(
+        self,
+        stats: FA3ReplayCacheStats,
+        selected: tuple[int, ...],
+        max_d2h_inflight: int,
+    ) -> None:
+        self.stats = stats
+        self.selected = tuple(sorted(int(index) for index in selected))
+        self.max_d2h_inflight = int(max_d2h_inflight)
+        self._descending = tuple(reversed(self.selected))
+        self._next_lower = {
+            current: self._descending[position + 1]
+            for position, current in enumerate(self._descending[:-1])
+        }
+        self._condition = threading.Condition()
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="h3-fa3-host-copy"
+        )
+        self._pending_forward: deque[concurrent.futures.Future[Any]] = deque()
+        self._entries: dict[int, _PageableCacheEntry] = {}
+        self._pages: dict[tuple[int, int], _PageableBuffer] = {}
+        self._stages: list[_StagePair] = []
+        self._copy_streams: dict[int, torch.cuda.Stream] = {}
+        self._preallocate()
+
+    @staticmethod
+    def _nbytes(tensor: torch.Tensor) -> int:
+        return int(tensor.numel() * tensor.element_size())
+
+    def _preallocate(self) -> None:
+        templates = (
+            (self._OUT_SHAPE, torch.bfloat16),
+            (self._LSE_SHAPE, torch.float32),
+        )
+        for block_index in self.selected:
+            for tensor_index, (shape, dtype) in enumerate(templates):
+                tensor = torch.empty(shape, dtype=dtype, device="cpu")
+                self._pages[(block_index, tensor_index)] = _PageableBuffer(tensor)
+                self.stats.cpu_pool_allocated_bytes += self._nbytes(tensor)
+        for _ in range(self.max_d2h_inflight):
+            tensors = tuple(
+                torch.empty(shape, dtype=dtype, device="cpu", pin_memory=True)
+                for shape, dtype in templates
+            )
+            pair = _StagePair(tensors=tensors)  # type: ignore[arg-type]
+            self._stages.append(pair)
+            self.stats.cpu_stage_allocated_bytes += sum(
+                self._nbytes(tensor) for tensor in tensors
+            )
+
+    def copy_stream(self, device: torch.device) -> torch.cuda.Stream:
+        index = int(device.index if device.index is not None else torch.cuda.current_device())
+        stream = self._copy_streams.get(index)
+        if stream is None:
+            stream = torch.cuda.Stream(device=index)
+            self._copy_streams[index] = stream
+        return stream
+
+    def begin_graph(self) -> None:
+        if self._entries:
+            self.stats.unexpected_cpu_storage_calls += 1
+            raise RuntimeError(
+                "H3 staged FA3 cache began a grad graph before the prior graph drained"
+            )
+
+    def _acquire_stage(self) -> _StagePair:
+        with self._condition:
+            while True:
+                for pair in self._stages:
+                    if not pair.in_use:
+                        pair.in_use = True
+                        return pair
+                self.stats.cpu_pool_busy_waits += 1
+                self._condition.wait()
+
+    def _release_stage(self, pair: _StagePair) -> None:
+        with self._condition:
+            pair.in_use = False
+            self._condition.notify_all()
+
+    def _throttle_forward(self) -> None:
+        while self._pending_forward and self._pending_forward[0].done():
+            self._pending_forward.popleft().result()
+        if len(self._pending_forward) < self.max_d2h_inflight:
+            return
+        self.stats.cpu_d2h_backpressure_waits += 1
+        self._pending_forward.popleft().result()
+
+    def stage_forward(
+        self, block_index: int, values: tuple[torch.Tensor, torch.Tensor]
+    ) -> _PageableCacheEntry:
+        if block_index in self._entries:
+            self.stats.unexpected_cpu_storage_calls += 1
+            raise RuntimeError(f"duplicate staged FA3 entry for block {block_index}")
+        if tuple(values[0].shape) != self._OUT_SHAPE or tuple(values[1].shape) != self._LSE_SHAPE:
+            self.stats.unexpected_cpu_storage_calls += 1
+            raise RuntimeError(
+                "H3 staged FA3 cache observed an unexpected production shape: "
+                f"{tuple(values[0].shape)}/{tuple(values[1].shape)}"
+            )
+        self._throttle_forward()
+        pair = self._acquire_stage()
+        pages = (
+            self._pages[(block_index, 0)],
+            self._pages[(block_index, 1)],
+        )
+        device = values[0].device
+        producer = torch.cuda.Event()
+        producer.record(torch.cuda.current_stream(device))
+        ready = torch.cuda.Event()
+        copy_stream = self.copy_stream(device)
+        with torch.cuda.stream(copy_stream):
+            copy_stream.wait_event(producer)
+            for stage, value in zip(pair.tensors, values):
+                stage.copy_(value, non_blocking=True)
+                value.record_stream(copy_stream)
+            ready.record(copy_stream)
+
+        def finish_forward_copy() -> None:
+            ready.synchronize()
+            for page, stage in zip(pages, pair.tensors):
+                if page.reusable_after is not None:
+                    page.reusable_after.synchronize()
+                    page.reusable_after = None
+                page.tensor.copy_(stage)
+            logical_bytes = sum(self._nbytes(page.tensor) for page in pages)
+            self.stats.cpu_forward_host_copy_entries += 1
+            self.stats.cpu_forward_host_copy_bytes += logical_bytes
+            self._release_stage(pair)
+
+        future = self._executor.submit(finish_forward_copy)
+        self._pending_forward.append(future)
+        entry = _PageableCacheEntry(block_index, pages, future, device)
+        self._entries[block_index] = entry
+        logical_bytes = sum(self._nbytes(page.tensor) for page in pages)
+        self.stats.cpu_d2h_entries += 1
+        self.stats.cpu_d2h_tensors += len(pages)
+        self.stats.cpu_d2h_bytes += logical_bytes
+        return entry
+
+    def _prefetch_block(self, block_index: int) -> None:
+        entry = self._entries.get(int(block_index))
+        if entry is None:
+            self.stats.cpu_backward_prefetch_misses += 1
+            raise RuntimeError(f"missing staged FA3 entry for backward block {block_index}")
+        if entry.backward_future is not None:
+            return
+
+        def prepare_stage() -> _StagePair:
+            entry.forward_future.result()
+            pair = self._acquire_stage()
+            for stage, page in zip(pair.tensors, entry.pages):
+                if page.reusable_after is not None:
+                    page.reusable_after.synchronize()
+                    page.reusable_after = None
+                stage.copy_(page.tensor)
+            logical_bytes = sum(self._nbytes(page.tensor) for page in entry.pages)
+            self.stats.cpu_backward_host_copy_entries += 1
+            self.stats.cpu_backward_host_copy_bytes += logical_bytes
+            return pair
+
+        entry.backward_future = self._executor.submit(prepare_stage)
+        self.stats.cpu_backward_prefetches += 1
+
+    def prefetch_first_before_backward(self) -> None:
+        if not self._descending:
+            return
+        self._prefetch_block(self._descending[0])
+
+    def prefetch_after_backward(self, block_index: int) -> None:
+        next_block = self._next_lower.get(int(block_index))
+        if next_block is not None:
+            self._prefetch_block(next_block)
+
+    def replay(self, entry: _PageableCacheEntry) -> tuple[torch.Tensor, torch.Tensor]:
+        if entry.backward_future is None:
+            self.stats.cpu_backward_prefetch_misses += 1
+            self._prefetch_block(entry.block_index)
+        assert entry.backward_future is not None
+        pair = entry.backward_future.result()
+        stream = torch.cuda.current_stream(entry.device)
+        values = tuple(
+            torch.empty_like(page.tensor, device=entry.device) for page in entry.pages
+        )
+        for value, stage in zip(values, pair.tensors):
+            value.copy_(stage, non_blocking=True)
+        reusable_after = torch.cuda.Event()
+        reusable_after.record(stream)
+        for page in entry.pages:
+            page.reusable_after = reusable_after
+
+        def release_after_h2d() -> None:
+            reusable_after.synchronize()
+            self._release_stage(pair)
+
+        self._executor.submit(release_after_h2d)
+        # Queue the next lower block now. The worker first observes the H2D
+        # completion above, then performs pageable->pinned staging while this
+        # block is recomputed and differentiated. Waiting until FA backward
+        # finishes would expose most of that host copy on the next block.
+        next_block = self._next_lower.get(int(entry.block_index))
+        if next_block is not None:
+            self._prefetch_block(next_block)
+        logical_bytes = sum(self._nbytes(page.tensor) for page in entry.pages)
+        self.stats.cpu_h2d_entries += 1
+        self.stats.cpu_h2d_tensors += len(entry.pages)
+        self.stats.cpu_h2d_bytes += logical_bytes
+        self._entries.pop(entry.block_index, None)
+        return values  # type: ignore[return-value]
+
+
+class _StagedCachingMode(TorchDispatchMode):
+    def __init__(self, storage: deque[_PageableCacheEntry], pool: _PageableStagingPool, block_index: int):
+        super().__init__()
+        self.storage = storage
+        self.pool = pool
+        self.block_index = int(block_index)
+
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        del types
+        result = func(*args, **({} if kwargs is None else kwargs))
+        if func != _fa3_forward_compact._opoverload:
+            return result
+        values = tuple(result)
+        if len(values) != 2 or any(value.device.type != "cuda" for value in values):
+            self.pool.stats.unexpected_cpu_storage_calls += 1
+            raise RuntimeError("H3 staged FA3 cache expected two CUDA outputs")
+        self.storage.append(self.pool.stage_forward(self.block_index, values))
+        return result
+
+
+class _StagedCachedMode(TorchDispatchMode):
+    def __init__(self, storage: deque[_PageableCacheEntry], pool: _PageableStagingPool):
+        super().__init__()
+        self.storage = storage
+        self.pool = pool
+
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        del types
+        if func != _fa3_forward_compact._opoverload:
+            return func(*args, **({} if kwargs is None else kwargs))
+        if not self.storage:
+            self.pool.stats.unexpected_cpu_storage_calls += 1
+            raise RuntimeError("H3 staged FA3 replay had no host entry")
+        return self.pool.replay(self.storage.popleft())
+
+
+def _create_staged_cache_contexts(
+    registration: "FA3ReplayCacheRegistration", block_index: int
+) -> tuple[TorchDispatchMode, TorchDispatchMode]:
+    if registration.staged_pool is None:
+        registration.stats.unexpected_cpu_storage_calls += 1
+        raise RuntimeError("H3 staged FA3 cache has no pageable/staging pool")
+    storage: deque[_PageableCacheEntry] = deque()
+    return (
+        _StagedCachingMode(storage, registration.staged_pool, block_index),
+        _StagedCachedMode(storage, registration.staged_pool),
+    )
+
+
+@dataclasses.dataclass
 class FA3ReplayCacheRegistration:
     enabled: bool
     block_indices: tuple[int, ...]
@@ -411,6 +724,7 @@ class FA3ReplayCacheRegistration:
     raw_backward_schema: str | None = None
     storage: str = "cuda"
     cpu_pool: _PinnedPool | None = None
+    staged_pool: _PageableStagingPool | None = None
     max_d2h_inflight: int = 2
     trim_before_backward: bool = False
 
@@ -486,12 +800,33 @@ def trim_allocator_before_backward(
         or not registration.trim_before_backward
     ):
         return False
-    if registration.storage != "cpu":
+    if registration.storage not in {"cpu", "cpu_staged"}:
         raise RuntimeError(
             "FA3 replay-cache allocator trim is authorized only for CPU storage"
         )
     torch.cuda.empty_cache()
     registration.stats.allocator_trim_calls += 1
+    return True
+
+
+def prepare_staged_cache_before_backward(
+    registration: "FA3ReplayCacheRegistration | None",
+) -> bool:
+    """Prime the first pageable cache entry before checkpoint replay.
+
+    The operation is default-off and only applies to ``cpu_staged``. It does
+    not allocate a GPU cache entry: one host worker copies the highest selected
+    block from its pageable reservoir into the bounded pinned stage. Subsequent
+    blocks are primed from replay while the current block is being recomputed.
+    """
+    if registration is None or not registration.enabled:
+        return False
+    if registration.storage != "cpu_staged":
+        return False
+    if registration.staged_pool is None:
+        registration.stats.unexpected_cpu_storage_calls += 1
+        raise RuntimeError("H3 staged FA3 cache registration has no staging pool")
+    registration.staged_pool.prefetch_first_before_backward()
     return True
 
 
@@ -557,6 +892,11 @@ def install_fa3_replay_cache(
     if not callable(raw_forward) or not callable(raw_backward):
         raise RuntimeError("H3 FA3 replay cache requires pinned raw forward/backward ops")
 
+    staged_pool = (
+        _PageableStagingPool(stats, selected, max_d2h_inflight)
+        if storage == "cpu_staged"
+        else None
+    )
     registration = FA3ReplayCacheRegistration(
         enabled=True,
         block_indices=selected,
@@ -573,10 +913,11 @@ def install_fa3_replay_cache(
         cpu_pool=(
             _PinnedPool(stats, max_d2h_inflight) if storage == "cpu" else None
         ),
+        staged_pool=staged_pool,
         max_d2h_inflight=max_d2h_inflight,
         trim_before_backward=bool(trim_before_backward),
     )
-    _RUNTIME = _Runtime(raw_forward, raw_backward, stats)
+    _RUNTIME = _Runtime(raw_forward, raw_backward, stats, staged_pool)
 
     @functools.wraps(original_kernel)
     def kernel_wrapper(
@@ -667,6 +1008,8 @@ def install_fa3_replay_cache(
         state["call_index"] = 0
         state["selected"] = 0
         if state["grad"]:
+            if registration.staged_pool is not None:
+                registration.staged_pool.begin_graph()
             stats.grad_transformer_forwards += 1
 
     def post_hook(_module: Any, _inputs: tuple[Any, ...], _output: Any) -> None:
@@ -695,19 +1038,22 @@ def install_fa3_replay_cache(
             )
         state["selected"] += 1
         stats.selected_checkpoint_wraps += 1
-        context_fn = (
-            cuda_context_fn
-            if registration.storage == "cuda"
-            else functools.partial(_create_cpu_cache_contexts, registration, index)
-        )
+        if registration.storage == "cuda":
+            context_fn = cuda_context_fn
+        elif registration.storage == "cpu":
+            context_fn = functools.partial(_create_cpu_cache_contexts, registration, index)
+        else:
+            context_fn = functools.partial(_create_staged_cache_contexts, registration, index)
 
         def scoped(*fn_args: Any, **fn_kwargs: Any):
             stats.selected_scoped_executions += 1
-            token = _CACHE_ACTIVE.set(True)
+            active_token = _CACHE_ACTIVE.set(True)
+            block_token = _CACHE_BLOCK_INDEX.set(index)
             try:
                 return function(*fn_args, **fn_kwargs)
             finally:
-                _CACHE_ACTIVE.reset(token)
+                _CACHE_BLOCK_INDEX.reset(block_token)
+                _CACHE_ACTIVE.reset(active_token)
 
         # Pinned Diffusers wraps torch.checkpoint in a closure that accepts
         # only ``(module, *args)`` and therefore cannot forward context_fn.
@@ -762,7 +1108,7 @@ def validate_cycle(
         ),
         "unexpected_cpu_storage_calls": 0,
     }
-    if registration.storage == "cpu":
+    if registration.storage in {"cpu", "cpu_staged"}:
         expected.update(
             {
                 "cpu_d2h_entries": selected_per_cycle,
@@ -771,6 +1117,15 @@ def validate_cycle(
                 "cpu_h2d_tensors": 2 * selected_per_cycle,
             }
         )
+        if registration.storage == "cpu_staged":
+            expected.update(
+                {
+                    "cpu_forward_host_copy_entries": selected_per_cycle,
+                    "cpu_backward_host_copy_entries": selected_per_cycle,
+                    "cpu_backward_prefetches": selected_per_cycle,
+                    "cpu_backward_prefetch_misses": 0,
+                }
+            )
     else:
         expected.update(
             {
@@ -792,7 +1147,7 @@ def validate_cycle(
     ]
     if delta["cached_logical_bytes"] <= 0:
         errors.append("cached_logical_bytes=0")
-    if registration.storage == "cpu":
+    if registration.storage in {"cpu", "cpu_staged"}:
         if delta["cpu_d2h_bytes"] != delta["cached_logical_bytes"]:
             errors.append(
                 "cpu_d2h_bytes="
@@ -803,6 +1158,19 @@ def validate_cycle(
                 "cpu_h2d_bytes="
                 f"{delta['cpu_h2d_bytes']} expected={delta['cached_logical_bytes']}"
             )
+        if registration.storage == "cpu_staged":
+            if delta["cpu_forward_host_copy_bytes"] != delta["cached_logical_bytes"]:
+                errors.append(
+                    "cpu_forward_host_copy_bytes="
+                    f"{delta['cpu_forward_host_copy_bytes']} "
+                    f"expected={delta['cached_logical_bytes']}"
+                )
+            if delta["cpu_backward_host_copy_bytes"] != delta["cached_logical_bytes"]:
+                errors.append(
+                    "cpu_backward_host_copy_bytes="
+                    f"{delta['cpu_backward_host_copy_bytes']} "
+                    f"expected={delta['cached_logical_bytes']}"
+                )
     if errors:
         raise RuntimeError("H3 FA3 replay cache cycle failed: " + "; ".join(errors))
     return delta

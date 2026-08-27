@@ -30,6 +30,7 @@ from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
 from .fused_swiglu import validate_cycle as validate_fused_swiglu_cycle
 from .fa3_nograd_splits import validate_cycle as validate_fa3_nograd_split_cycle
 from .fa3_replay_cache import (
+    prepare_staged_cache_before_backward,
     trim_allocator_before_backward,
     validate_cycle as validate_fa3_replay_cache_cycle,
 )
@@ -324,9 +325,9 @@ class H3A100LoopMixin:
         segments before the checkpoint backward creates its transient q/k/v
         and FSDP working set.
         """
-        trim_allocator_before_backward(
-            getattr(self, "fa3_replay_cache_registration", None)
-        )
+        registration = getattr(self, "fa3_replay_cache_registration", None)
+        trim_allocator_before_backward(registration)
+        prepare_staged_cache_before_backward(registration)
 
     def _begin_lora_scale1_cycle(self) -> None:
         registration = getattr(self, "lora_scale1_elision_registration", None)

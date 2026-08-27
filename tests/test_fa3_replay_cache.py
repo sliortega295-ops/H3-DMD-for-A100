@@ -15,6 +15,7 @@ from h3_a100.fa3_replay_cache import (
     parse_block_indices,
     parse_max_d2h_inflight,
     parse_storage,
+    prepare_staged_cache_before_backward,
     trim_allocator_before_backward,
     validate_cycle,
 )
@@ -49,6 +50,7 @@ def test_default_off_integration_and_parser():
         parse_block_indices("50")
     assert parse_storage(None) == "cuda"
     assert parse_storage("CPU") == "cpu"
+    assert parse_storage("CPU_STAGED") == "cpu_staged"
     with pytest.raises(ValueError, match="storage must be"):
         parse_storage("disk")
     assert parse_max_d2h_inflight(None) == 2
@@ -93,6 +95,26 @@ def test_allocator_trim_is_default_off_and_cpu_only(monkeypatch):
     registration.storage = "cuda"
     with pytest.raises(RuntimeError, match="authorized only for CPU storage"):
         trim_allocator_before_backward(registration)
+
+    registration.storage = "cpu_staged"
+    assert trim_allocator_before_backward(registration)
+    assert calls == ["trim", "trim"]
+
+
+def test_staged_prefetch_gate_is_storage_scoped():
+    calls = []
+    pool = SimpleNamespace(prefetch_first_before_backward=lambda: calls.append("prefetch"))
+    registration = SimpleNamespace(
+        enabled=True,
+        storage="cpu",
+        staged_pool=pool,
+        stats=SimpleNamespace(unexpected_cpu_storage_calls=0),
+    )
+    assert not prepare_staged_cache_before_backward(registration)
+    assert calls == []
+    registration.storage = "cpu_staged"
+    assert prepare_staged_cache_before_backward(registration)
+    assert calls == ["prefetch"]
 
 
 class _Block(nn.Module):
@@ -262,4 +284,39 @@ def test_cpu_storage_cycle_validator_reconciles_exact_transfer_bytes():
     assert validate_cycle(registration, {})["cpu_h2d_bytes"] == logical_bytes
     stats.cpu_h2d_bytes -= 1
     with pytest.raises(RuntimeError, match="cpu_h2d_bytes"):
+        validate_cycle(registration, {})
+
+
+def test_staged_storage_cycle_validator_reconciles_host_staging():
+    blocks = (38, 39)
+    selected = len(blocks) * EXPECTED_GRAD_TRANSFORMER_FORWARDS
+    logical_bytes = 789
+    stats = FA3ReplayCacheStats(
+        grad_transformer_forwards=6,
+        completed_grad_transformer_forwards=6,
+        selected_checkpoint_wraps=selected,
+        selected_scoped_executions=2 * selected,
+        compact_attention_entries=2 * selected,
+        compact_forward_impl_calls=selected,
+        compact_backward_calls=selected,
+        cached_logical_bytes=logical_bytes,
+        cpu_d2h_entries=selected,
+        cpu_h2d_entries=selected,
+        cpu_d2h_tensors=2 * selected,
+        cpu_h2d_tensors=2 * selected,
+        cpu_d2h_bytes=logical_bytes,
+        cpu_h2d_bytes=logical_bytes,
+        cpu_forward_host_copy_entries=selected,
+        cpu_forward_host_copy_bytes=logical_bytes,
+        cpu_backward_host_copy_entries=selected,
+        cpu_backward_host_copy_bytes=logical_bytes,
+        cpu_backward_prefetches=selected,
+    )
+    registration = FA3ReplayCacheRegistration(
+        True, blocks, None, None, None, None, None, None, stats, storage="cpu_staged"
+    )
+    delta = validate_cycle(registration, {})
+    assert delta["cpu_backward_prefetches"] == selected
+    stats.cpu_backward_prefetch_misses += 1
+    with pytest.raises(RuntimeError, match="cpu_backward_prefetch_misses"):
         validate_cycle(registration, {})

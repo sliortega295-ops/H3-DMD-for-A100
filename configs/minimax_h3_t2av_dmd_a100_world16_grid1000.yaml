@@ -126,8 +126,9 @@ training:
       enabled: false
       blocks: []
       # cuda preserves the Iteration-401 GPU-resident implementation. The
-      # bounded CPU-staged candidate is selected explicitly through
-      # H3_FA3_REPLAY_CACHE_STORAGE=cpu.
+      # bounded raw-pinned candidate is selected with ``cpu``. The long-lived
+      # pageable reservoir plus bounded pinned transfer window is selected with
+      # ``cpu_staged``; both remain explicit diagnostic candidates.
       storage: cuda
       # CPU-staged mode bounds source tensors retained by asynchronous D2H.
       max_d2h_inflight: 2
