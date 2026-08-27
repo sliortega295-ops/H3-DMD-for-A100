@@ -1,0 +1,20 @@
+{
+  "run_id": "iteration_404_fa3_cpu_replay_cache_bounded_20260826",
+  "status": "FAIL_REPEATED_SAFETY_HBM",
+  "source_head": "c2c123a43f0ea4380dd617557db0c50486ec05a5",
+  "parent_failure_run": "iteration_403_fa3_cpu_replay_cache_world16_20260826",
+  "formal_parent_run": "iteration_393_fa3_splits2_grad_world16_20260826",
+  "formal_parent_seconds": 812.029,
+  "target_seconds": 780.0,
+  "candidate_seconds": null,
+  "tests": {"focused": "PASS_5", "full": "PASS_71", "cuda_canary": "PASS_BITWISE"},
+  "candidate": {"storage": "cpu", "blocks": "0-49", "max_d2h_inflight": 2, "checkpoint_segment": 1, "activation_policy": "none"},
+  "node_exit": {"node0": 162, "node1": 1},
+  "node0": {"max_used_mib": 39616, "min_free_mib": 722, "cgroup_peak_bytes": 499602288640},
+  "node1": {"max_used_mib": 39188, "min_free_mib": 1150, "cgroup_peak_bytes": 479621033984},
+  "oom_delta": {"node0_cuda": 0, "node1_cuda": 0, "node0_cgroup": 0, "node1_cgroup": 0},
+  "cleanup": "PASS_16_GPUS_IDLE_ALL_LOCKS_FREE",
+  "conclusion": "Depth-2 backpressure reproduced Iteration 403 at the same phase and magnitude; async queueing is not the dominant remaining HBM source.",
+  "unresolved": "compact custom-autograd checkpoint/replay transient plus FSDP/FA3 working set",
+  "next_iteration_constraint": "No depth-1 or invasive replay-cache escalation without a materially new preregistered mechanism or explicit safety-contract change."
+}
