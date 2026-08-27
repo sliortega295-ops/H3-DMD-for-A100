@@ -463,16 +463,17 @@ def install_grid_trainer_patch() -> None:
             raise RuntimeError("grid manifest video_shift mismatch")
         if abs(float(payload["audio_shift"]) - float(self.audio_shift)) > 1e-12:
             raise RuntimeError("grid manifest audio_shift mismatch")
-        self.grid_replay_registration = install_grid_checkpoint_replay_scope(
-            self.shared_model.denoiser_module(), controller, expected_block_count=50
-        )
-        # The compact FA3 wrapper must sit outside the exact Grid key wrapper:
-        # the native checkpoint stores both the AdaLN scope and the selective
-        # attention cache context without moving either checkpoint boundary.
+        # Install the selective wrapper first. The exact Grid wrapper then sits
+        # outside it and supplies the captured AdaLN key to both original and
+        # replay executions. This ordering is required because pinned
+        # Diffusers' checkpoint closure does not accept ``context_fn``.
         self.fa3_replay_cache_registration = install_fa3_replay_cache(
             self.shared_model.denoiser_module(),
             block_indices=self.fa3_replay_cache_blocks,
             parent_split_registration=self.fa3_nograd_split_registration,
+        )
+        self.grid_replay_registration = install_grid_checkpoint_replay_scope(
+            self.shared_model.denoiser_module(), controller, expected_block_count=50
         )
         logger.info(
             "[h3-a100][fa3-replay-cache] enabled={} blocks={}",

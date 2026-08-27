@@ -24,7 +24,7 @@ from typing import Any
 
 import torch
 from loguru import logger
-from torch.utils.checkpoint import create_selective_checkpoint_contexts
+from torch.utils.checkpoint import checkpoint, create_selective_checkpoint_contexts
 
 
 EXPECTED_BLOCK_COUNT = 50
@@ -413,9 +413,11 @@ def install_fa3_replay_cache(
         state["call_index"] = index + 1
         if index not in selected:
             return original_checkpoint(function, *args, **kwargs)
-        if "context_fn" in kwargs:
+        if "context_fn" in kwargs or "use_reentrant" in kwargs:
             stats.unexpected_checkpoint_contract_calls += 1
-            raise RuntimeError("H3 FA3 replay cache observed an existing checkpoint context_fn")
+            raise RuntimeError(
+                "H3 FA3 replay cache observed an existing checkpoint policy override"
+            )
         state["selected"] += 1
         stats.selected_checkpoint_wraps += 1
 
@@ -427,9 +429,15 @@ def install_fa3_replay_cache(
             finally:
                 _CACHE_ACTIVE.reset(token)
 
-        return original_checkpoint(
+        # Pinned Diffusers wraps torch.checkpoint in a closure that accepts
+        # only ``(module, *args)`` and therefore cannot forward context_fn.
+        # Use the exact same non-reentrant policy directly for selected calls.
+        # The Grid key wrapper is installed outside this wrapper, so its
+        # scoped function remains the callable checkpointed here.
+        return checkpoint(
             scoped,
             *args,
+            use_reentrant=False,
             context_fn=context_fn,
             **kwargs,
         )

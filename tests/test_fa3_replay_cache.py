@@ -1,4 +1,3 @@
-from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -75,7 +74,12 @@ class _Transformer(nn.Module):
         self.transformer_blocks = nn.ModuleList(
             [_Block(kernel_config) for _ in range(50)]
         )
-        self._gradient_checkpointing_func = partial(checkpoint, use_reentrant=False)
+        # Match pinned Diffusers: its closure deliberately accepts no kwargs,
+        # so a candidate cannot accidentally rely on forwarding context_fn.
+        def diffusers_checkpoint(module, *args):
+            return checkpoint(module.__call__, *args, use_reentrant=False)
+
+        self._gradient_checkpointing_func = diffusers_checkpoint
 
     def forward(self, value):
         for block in self.transformer_blocks:
@@ -129,6 +133,17 @@ def test_selected_blocks_cache_exact_compact_forward_and_keep_parent_census():
         raw_forward=raw_forward,
         raw_backward=raw_backward,
     )
+    # Match production ordering: the Grid replay/key wrapper is outside the
+    # candidate and passes a scoped callable into it.
+    candidate_checkpoint = transformer._gradient_checkpointing_func
+
+    def grid_like_checkpoint(function, *args):
+        def grid_scoped(*fn_args):
+            return function(*fn_args)
+
+        return candidate_checkpoint(grid_scoped, *args)
+
+    transformer._gradient_checkpointing_func = grid_like_checkpoint
 
     initial = torch.randn(1, 2, 56, 128)
     reference = initial.clone().requires_grad_(True)
