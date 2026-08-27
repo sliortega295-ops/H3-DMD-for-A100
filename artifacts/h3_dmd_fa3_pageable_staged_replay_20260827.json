@@ -1,0 +1,67 @@
+{
+  "run_id": "iteration_418_fa3_pageable_staged_all50_inflight2_20260827",
+  "status": "PASS_TARGET_780_ACHIEVED",
+  "source_head": "cfecbb4188e1f3820451657f744aa2c823e24da4",
+  "world_size": 16,
+  "tests": {
+    "focused_fa3_replay_both_nodes": "PASS_8_EACH",
+    "full_node0": "PASS_74"
+  },
+  "workload": {
+    "placement": "world16_fsdp2_full_shard",
+    "dtype": "bf16",
+    "batch_per_rank": 1,
+    "global_batch": 16,
+    "student_updates": 1,
+    "fake_updates": 5,
+    "application_forwards": {"student": 24, "fake": 6, "teacher": 1},
+    "grad_forwards": {"student": 1, "fake": 5, "teacher": 0},
+    "backwards": {"student": 1, "fake": 5},
+    "checkpoint_segment": 1,
+    "activation_policy": "none"
+  },
+  "candidate": {
+    "storage": "cpu_staged",
+    "blocks": "0-49",
+    "max_d2h_inflight": 2,
+    "trim_before_backward": true
+  },
+  "timing": {
+    "boundary": "rank0 train start through post-world16 matched workload receipt",
+    "candidate_seconds": 772.332,
+    "baseline_run": "iteration_393_fa3_splits2_grad_world16_20260826",
+    "baseline_seconds": 812.029,
+    "delta_seconds": -39.697,
+    "percent_change": -4.888618509930065,
+    "speedup": 1.0513988802742862,
+    "target_seconds": 780.0,
+    "target_margin_seconds": 7.668
+  },
+  "replay": {
+    "grid_wraps": 300,
+    "grid_scoped_executions": 600,
+    "grid_hits": 600,
+    "grid_misses": 0,
+    "fa3_selected_wraps": 300,
+    "fa3_scoped_executions": 600,
+    "fa3_compact_forward_calls": 300,
+    "fa3_compact_backward_calls": 300,
+    "bytes_each_reconciled_path_rank0": 164794448000,
+    "backward_prefetches": 300,
+    "backward_prefetch_misses": 0,
+    "unexpected_contract_calls": 0
+  },
+  "capacity": {
+    "peak_allocated_rank0_gib": 33.39,
+    "end_reserved_rank0_gib": 35.32,
+    "node0_min_driver_free_mib": 998,
+    "node1_min_driver_free_mib": 128,
+    "node0_cgroup_peak_gib": 239.60465621948242,
+    "node1_cgroup_peak_gib": 239.48370742797852,
+    "cuda_oom": false,
+    "cgroup_oom_kill_delta": {"node0": 0, "node1": 0}
+  },
+  "cleanup": "PASS_16_GPUS_IDLE_ALL_LOCKS_FREE",
+  "claim_boundary": "one unprofiled matched world16 run; no repeated-trial variance claim",
+  "evidence_root": "/home/lyy/Helios/research_artifacts/H3-DMD-for-A100/iteration_418_fa3_pageable_staged_all50_inflight2_20260827"
+}
