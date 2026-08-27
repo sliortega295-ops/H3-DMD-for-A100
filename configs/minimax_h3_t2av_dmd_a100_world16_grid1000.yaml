@@ -120,6 +120,11 @@ training:
       num_splits: 1
       # Independent default-off checkpoint-forward/replay candidate.
       grad_num_splits: 1
+    fa3_replay_cache:
+      # Default-off exact replay cache. A bounded experiment may select main
+      # transformer block indices through H3_FA3_REPLAY_CACHE_BLOCKS.
+      enabled: false
+      blocks: []
     lora_scale1_elision:
       # Opt-in removal of PEFT's identity multiply when rank == alpha.
       enabled: false

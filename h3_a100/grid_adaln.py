@@ -30,6 +30,7 @@ from loguru import logger
 from torch import nn
 
 from .adaln_cache import CacheStats
+from .fa3_replay_cache import install_fa3_replay_cache, parse_block_indices
 
 SCHEMA_VERSION = "h3_a100.adaln_grid.v1"
 DEFAULT_GRID_SIZE = 1000
@@ -370,6 +371,9 @@ def install_grid_trainer_patch() -> None:
     def trainer_init(self, config):
         original_trainer_init(self, config)
         grid = self.training_config.get("a100", {}).get("adaln_grid", {})
+        replay_cache = self.training_config.get("a100", {}).get(
+            "fa3_replay_cache", {}
+        )
         self.adaln_grid_enabled = bool(grid.get("enabled", True))
         self.adaln_grid_size = int(grid.get("grid_size", DEFAULT_GRID_SIZE))
         self.adaln_grid_manifest = str(
@@ -385,6 +389,15 @@ def install_grid_trainer_patch() -> None:
         self._grid_base_sigmas_cpu = torch.linspace(
             low, high, self.adaln_grid_size, dtype=torch.float32
         )
+        env_blocks = os.environ.get("H3_FA3_REPLAY_CACHE_BLOCKS")
+        configured_blocks = replay_cache.get("blocks", ())
+        if env_blocks is not None:
+            self.fa3_replay_cache_blocks = parse_block_indices(env_blocks)
+        elif bool(replay_cache.get("enabled", False)):
+            self.fa3_replay_cache_blocks = parse_block_indices(configured_blocks)
+        else:
+            self.fa3_replay_cache_blocks = ()
+        self.fa3_replay_cache_registration = None
 
     def model_prepare(
         self,
@@ -452,6 +465,19 @@ def install_grid_trainer_patch() -> None:
             raise RuntimeError("grid manifest audio_shift mismatch")
         self.grid_replay_registration = install_grid_checkpoint_replay_scope(
             self.shared_model.denoiser_module(), controller, expected_block_count=50
+        )
+        # The compact FA3 wrapper must sit outside the exact Grid key wrapper:
+        # the native checkpoint stores both the AdaLN scope and the selective
+        # attention cache context without moving either checkpoint boundary.
+        self.fa3_replay_cache_registration = install_fa3_replay_cache(
+            self.shared_model.denoiser_module(),
+            block_indices=self.fa3_replay_cache_blocks,
+            parent_split_registration=self.fa3_nograd_split_registration,
+        )
+        logger.info(
+            "[h3-a100][fa3-replay-cache] enabled={} blocks={}",
+            self.fa3_replay_cache_registration.enabled,
+            list(self.fa3_replay_cache_blocks),
         )
         return result
 

@@ -29,6 +29,7 @@ from .fused_qk_rmsnorm_rotary import validate_cycle as validate_fused_qk_cycle
 from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
 from .fused_swiglu import validate_cycle as validate_fused_swiglu_cycle
 from .fa3_nograd_splits import validate_cycle as validate_fa3_nograd_split_cycle
+from .fa3_replay_cache import validate_cycle as validate_fa3_replay_cache_cycle
 from .lora_scale1_elision import validate_cycle as validate_lora_scale1_cycle
 from .trainer_runtime import PreparedFakeUpdate
 
@@ -66,6 +67,7 @@ class H3A100LoopMixin:
             self._begin_fused_qk_cycle()
             self._begin_fused_swiglu_cycle()
             self._begin_fa3_nograd_split_cycle()
+            self._begin_fa3_replay_cache_cycle()
             self._begin_lora_scale1_cycle()
             runtime_state_start = self.shared_model.runtime_state_stats()
             with self._nvtx("h3/student_step"):
@@ -80,6 +82,7 @@ class H3A100LoopMixin:
             self._validate_fused_qk_cycle(current_iter)
             self._validate_fused_swiglu_cycle(current_iter)
             self._validate_fa3_nograd_split_cycle(current_iter)
+            self._validate_fa3_replay_cache_cycle(current_iter)
             self._validate_lora_scale1_cycle(current_iter)
             runtime_state_end = self.shared_model.runtime_state_stats()
             logger.info(
@@ -299,6 +302,14 @@ class H3A100LoopMixin:
             None if registration is None or not registration.enabled else registration.snapshot()
         )
 
+    def _begin_fa3_replay_cache_cycle(self) -> None:
+        registration = getattr(self, "fa3_replay_cache_registration", None)
+        self._fa3_replay_cache_cycle_start = (
+            None
+            if registration is None or not registration.enabled
+            else registration.snapshot()
+        )
+
     def _begin_lora_scale1_cycle(self) -> None:
         registration = getattr(self, "lora_scale1_elision_registration", None)
         self._lora_scale1_cycle_start = (
@@ -384,6 +395,24 @@ class H3A100LoopMixin:
             get_rank(),
             registration.num_splits,
             registration.grad_num_splits,
+            delta,
+        )
+
+    def _validate_fa3_replay_cache_cycle(self, current_iter: int) -> None:
+        registration = getattr(self, "fa3_replay_cache_registration", None)
+        if registration is None or not registration.enabled:
+            return
+        start = self._fa3_replay_cache_cycle_start
+        if start is None:
+            raise RuntimeError("H3 FA3 replay-cache cycle baseline is missing")
+        delta = validate_fa3_replay_cache_cycle(registration, start)
+        logger.info(
+            "[h3-a100][fa3-replay-cache] iter={} rank={} blocks={} "
+            "cached_logical_gib={:.3f} delta={}",
+            current_iter,
+            get_rank(),
+            list(registration.block_indices),
+            delta["cached_logical_bytes"] / 2**30,
             delta,
         )
 
