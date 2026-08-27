@@ -13,6 +13,7 @@ from h3_a100.fa3_replay_cache import (
     FA3ReplayCacheStats,
     install_fa3_replay_cache,
     parse_block_indices,
+    parse_max_d2h_inflight,
     parse_storage,
     validate_cycle,
 )
@@ -33,7 +34,9 @@ def test_default_off_integration_and_parser():
     assert "fa3_replay_cache:" in config
     assert "enabled: false" in config
     assert "storage: cuda" in config
+    assert "max_d2h_inflight: 2" in config
     assert "H3_FA3_REPLAY_CACHE_STORAGE" in grid
+    assert "H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT" in grid
     assert parse_block_indices(None) == ()
     assert parse_block_indices("") == ()
     assert parse_block_indices("40-42,49") == (40, 41, 42, 49)
@@ -45,6 +48,10 @@ def test_default_off_integration_and_parser():
     assert parse_storage("CPU") == "cpu"
     with pytest.raises(ValueError, match="storage must be"):
         parse_storage("disk")
+    assert parse_max_d2h_inflight(None) == 2
+    assert parse_max_d2h_inflight("1") == 1
+    with pytest.raises(ValueError, match="must be >=1"):
+        parse_max_d2h_inflight(0)
 
 
 def test_disabled_install_does_not_touch_transformer_or_kernel():

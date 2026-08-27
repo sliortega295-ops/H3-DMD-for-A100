@@ -33,6 +33,7 @@ from .adaln_cache import CacheStats
 from .fa3_replay_cache import (
     install_fa3_replay_cache,
     parse_block_indices,
+    parse_max_d2h_inflight,
     parse_storage,
 )
 
@@ -406,6 +407,12 @@ def install_grid_trainer_patch() -> None:
                 "H3_FA3_REPLAY_CACHE_STORAGE", replay_cache.get("storage", "cuda")
             )
         )
+        self.fa3_replay_cache_max_d2h_inflight = parse_max_d2h_inflight(
+            os.environ.get(
+                "H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT",
+                replay_cache.get("max_d2h_inflight", 2),
+            )
+        )
         self.fa3_replay_cache_registration = None
 
     def model_prepare(
@@ -481,15 +488,18 @@ def install_grid_trainer_patch() -> None:
             block_indices=self.fa3_replay_cache_blocks,
             parent_split_registration=self.fa3_nograd_split_registration,
             storage=self.fa3_replay_cache_storage,
+            max_d2h_inflight=self.fa3_replay_cache_max_d2h_inflight,
         )
         self.grid_replay_registration = install_grid_checkpoint_replay_scope(
             self.shared_model.denoiser_module(), controller, expected_block_count=50
         )
         logger.info(
-            "[h3-a100][fa3-replay-cache] enabled={} blocks={} storage={}",
+            "[h3-a100][fa3-replay-cache] enabled={} blocks={} storage={} "
+            "max_d2h_inflight={}",
             self.fa3_replay_cache_registration.enabled,
             list(self.fa3_replay_cache_blocks),
             self.fa3_replay_cache_storage,
+            self.fa3_replay_cache_max_d2h_inflight,
         )
         return result
 

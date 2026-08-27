@@ -58,7 +58,9 @@ class FA3ReplayCacheStats:
     cpu_h2d_bytes: int = 0
     cpu_pool_allocated_bytes: int = 0
     cpu_pool_reused_tensors: int = 0
+    cpu_pool_busy_waits: int = 0
     cpu_pool_busy_misses: int = 0
+    cpu_d2h_backpressure_waits: int = 0
     unexpected_cpu_storage_calls: int = 0
     unexpected_kernel_contract_calls: int = 0
     unexpected_checkpoint_contract_calls: int = 0
@@ -203,10 +205,12 @@ class _CPUCacheEntry:
 class _PinnedPool:
     """Process-local pinned buffers reused across the six sequential grad graphs."""
 
-    def __init__(self, stats: FA3ReplayCacheStats) -> None:
+    def __init__(self, stats: FA3ReplayCacheStats, max_d2h_inflight: int) -> None:
         self.stats = stats
+        self.max_d2h_inflight = int(max_d2h_inflight)
         self._buffers: dict[tuple[Any, ...], list[_PinnedBuffer]] = defaultdict(list)
         self._copy_streams: dict[int, torch.cuda.Stream] = {}
+        self._pending_d2h: dict[int, deque[torch.cuda.Event]] = defaultdict(deque)
 
     @staticmethod
     def _key(block_index: int, tensor_index: int, value: torch.Tensor) -> tuple[Any, ...]:
@@ -231,14 +235,16 @@ class _PinnedPool:
     ) -> _PinnedBuffer:
         key = self._key(block_index, tensor_index, value)
         candidates = self._buffers[key]
-        for candidate in candidates:
-            event = candidate.reusable_after
-            if event is None or event.query():
-                candidate.reusable_after = None
-                self.stats.cpu_pool_reused_tensors += 1
-                return candidate
         if candidates:
-            self.stats.cpu_pool_busy_misses += 1
+            # There is exactly one logical cache entry per block in each grad
+            # graph. Reuse its process-local host buffer across sequential
+            # graphs. If the previous H2D has not completed, the D2H copy
+            # stream waits on that event before overwriting the host buffer.
+            candidate = candidates[0]
+            if candidate.reusable_after is not None and not candidate.reusable_after.query():
+                self.stats.cpu_pool_busy_waits += 1
+            self.stats.cpu_pool_reused_tensors += 1
+            return candidate
         tensor = torch.empty_like(
             value, device="cpu", pin_memory=True, memory_format=torch.preserve_format
         )
@@ -248,6 +254,25 @@ class _PinnedPool:
             tensor.numel() * tensor.element_size()
         )
         return candidate
+
+    def throttle_before_forward(self, device: torch.device) -> None:
+        index = int(device.index if device.index is not None else torch.cuda.current_device())
+        pending = self._pending_d2h[index]
+        while pending and pending[0].query():
+            pending.popleft()
+        if len(pending) < self.max_d2h_inflight:
+            return
+        # Add a device-side dependency rather than a host synchronize. The
+        # next compact FA3 allocation cannot run until the oldest D2H has
+        # released its source, bounding retained GPU outputs while allowing
+        # intervening block compute to overlap with the copy stream.
+        oldest = pending.popleft()
+        torch.cuda.current_stream(device).wait_event(oldest)
+        self.stats.cpu_d2h_backpressure_waits += 1
+
+    def record_d2h(self, device: torch.device, ready: torch.cuda.Event) -> None:
+        index = int(device.index if device.index is not None else torch.cuda.current_device())
+        self._pending_d2h[index].append(ready)
 
     @staticmethod
     def release(buffer: _PinnedBuffer, reusable_after: torch.cuda.Event) -> None:
@@ -271,6 +296,8 @@ class _HostCachingMode(TorchDispatchMode):
     def __torch_dispatch__(self, func, types, args=(), kwargs=None):
         del types
         kwargs = {} if kwargs is None else kwargs
+        if func == _fa3_forward_compact._opoverload:
+            self.pool.throttle_before_forward(args[0].device)
         result = func(*args, **kwargs)
         if func != _fa3_forward_compact._opoverload:
             return result
@@ -294,9 +321,13 @@ class _HostCachingMode(TorchDispatchMode):
         with torch.cuda.stream(copy_stream):
             copy_stream.wait_event(producer)
             for buffer, value in zip(buffers, values):
+                if buffer.reusable_after is not None:
+                    copy_stream.wait_event(buffer.reusable_after)
+                    buffer.reusable_after = None
                 buffer.tensor.copy_(value, non_blocking=True)
                 value.record_stream(copy_stream)
             ready.record(copy_stream)
+        self.pool.record_d2h(device, ready)
         logical_bytes = sum(
             int(buffer.tensor.numel() * buffer.tensor.element_size())
             for buffer in buffers
@@ -379,6 +410,7 @@ class FA3ReplayCacheRegistration:
     raw_backward_schema: str | None = None
     storage: str = "cuda"
     cpu_pool: _PinnedPool | None = None
+    max_d2h_inflight: int = 2
 
     def snapshot(self) -> dict[str, int]:
         return dataclasses.asdict(self.stats)
@@ -391,6 +423,7 @@ class FA3ReplayCacheRegistration:
             "raw_forward_schema": self.raw_forward_schema,
             "raw_backward_schema": self.raw_backward_schema,
             "storage": self.storage,
+            "max_d2h_inflight": self.max_d2h_inflight,
             "stats": self.snapshot(),
         }
 
@@ -433,6 +466,13 @@ def parse_storage(value: str | None) -> str:
     return storage
 
 
+def parse_max_d2h_inflight(value: int | str | None) -> int:
+    parsed = 2 if value is None else int(value)
+    if parsed < 1:
+        raise ValueError(f"FA3 replay-cache max D2H in-flight must be >=1, got {value!r}")
+    return parsed
+
+
 def _schema(value: Any) -> str | None:
     schema = getattr(value, "_schema", None)
     return None if schema is None else str(schema)
@@ -447,12 +487,14 @@ def install_fa3_replay_cache(
     raw_forward: Callable[..., Any] | None = None,
     raw_backward: Callable[..., Any] | None = None,
     storage: str = "cuda",
+    max_d2h_inflight: int = 2,
 ) -> FA3ReplayCacheRegistration:
     """Install the exact replay cache after Grid scope and split2 wrappers."""
 
     global _RUNTIME
     selected = parse_block_indices(block_indices)
     storage = parse_storage(storage)
+    max_d2h_inflight = parse_max_d2h_inflight(max_d2h_inflight)
     stats = FA3ReplayCacheStats()
     if not selected:
         return FA3ReplayCacheRegistration(
@@ -505,7 +547,10 @@ def install_fa3_replay_cache(
         raw_forward_schema=_schema(raw_forward),
         raw_backward_schema=_schema(raw_backward),
         storage=storage,
-        cpu_pool=_PinnedPool(stats) if storage == "cpu" else None,
+        cpu_pool=(
+            _PinnedPool(stats, max_d2h_inflight) if storage == "cpu" else None
+        ),
+        max_d2h_inflight=max_d2h_inflight,
     )
     _RUNTIME = _Runtime(raw_forward, raw_backward, stats)
 
@@ -658,9 +703,11 @@ def install_fa3_replay_cache(
     transformer._gradient_checkpointing_func = checkpoint_wrapper
     logger.info(
         "[h3-a100][fa3-replay-cache] installed blocks={} storage={} "
+        "max_d2h_inflight={} "
         "cached_outputs=out+lse split=2",
         list(selected),
         storage,
+        max_d2h_inflight,
     )
     return registration
 
