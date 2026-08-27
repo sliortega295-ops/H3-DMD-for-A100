@@ -1074,11 +1074,14 @@ def install_fa3_replay_cache(
     logger.info(
         "[h3-a100][fa3-replay-cache] installed blocks={} storage={} "
         "max_d2h_inflight={} "
-        "trim_before_backward={} cached_outputs=out+lse split=2",
+        "trim_before_backward={} cached_outputs=out+lse split=2 "
+        "pageable_pool_bytes={} pinned_stage_bytes={}",
         list(selected),
         storage,
         max_d2h_inflight,
         bool(trim_before_backward),
+        stats.cpu_pool_allocated_bytes,
+        stats.cpu_stage_allocated_bytes,
     )
     return registration
 
