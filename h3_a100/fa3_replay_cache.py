@@ -429,6 +429,7 @@ class _StagePair:
 class _PageableCacheEntry:
     block_index: int
     pages: tuple[_PageableBuffer, _PageableBuffer]
+    shapes: tuple[tuple[int, ...], tuple[int, ...]]
     forward_future: concurrent.futures.Future[Any]
     device: torch.device
     backward_future: concurrent.futures.Future[Any] | None = None
@@ -477,6 +478,16 @@ class _PageableStagingPool:
     @staticmethod
     def _nbytes(tensor: torch.Tensor) -> int:
         return int(tensor.numel() * tensor.element_size())
+
+    @staticmethod
+    def _view(tensor: torch.Tensor, tensor_index: int, shape: tuple[int, ...]) -> torch.Tensor:
+        del tensor_index
+        # Use a flat prefix rather than slicing the sequence dimension from a
+        # max-shape tensor. In particular, slicing LSE's last dimension would
+        # retain the max-sequence row stride and turn one logical transfer into
+        # many strided copies. The prefix has the exact contiguous layout that
+        # the production FA3 op returned for this rank-qualified sequence.
+        return tensor.view(-1)[: math.prod(shape)].view(shape)
 
     def _preallocate(self) -> None:
         templates = (
@@ -543,11 +554,18 @@ class _PageableStagingPool:
         if block_index in self._entries:
             self.stats.unexpected_cpu_storage_calls += 1
             raise RuntimeError(f"duplicate staged FA3 entry for block {block_index}")
-        if tuple(values[0].shape) != self._OUT_SHAPE or tuple(values[1].shape) != self._LSE_SHAPE:
+        shapes = (tuple(values[0].shape), tuple(values[1].shape))
+        sequence = int(shapes[0][1]) if len(shapes[0]) == 4 else -1
+        valid_shapes = (
+            shapes[0] == (1, sequence, EXPECTED_HEADS, EXPECTED_HEAD_DIM)
+            and shapes[1] == (1, EXPECTED_HEADS, sequence)
+            and 0 < sequence <= EXPECTED_SEQUENCE
+        )
+        if not valid_shapes:
             self.stats.unexpected_cpu_storage_calls += 1
             raise RuntimeError(
                 "H3 staged FA3 cache observed an unexpected production shape: "
-                f"{tuple(values[0].shape)}/{tuple(values[1].shape)}"
+                f"{shapes[0]}/{shapes[1]}"
             )
         self._throttle_forward()
         pair = self._acquire_stage()
@@ -562,28 +580,34 @@ class _PageableStagingPool:
         copy_stream = self.copy_stream(device)
         with torch.cuda.stream(copy_stream):
             copy_stream.wait_event(producer)
-            for stage, value in zip(pair.tensors, values):
-                stage.copy_(value, non_blocking=True)
+            for tensor_index, (stage, value, shape) in enumerate(
+                zip(pair.tensors, values, shapes)
+            ):
+                self._view(stage, tensor_index, shape).copy_(value, non_blocking=True)
                 value.record_stream(copy_stream)
             ready.record(copy_stream)
 
         def finish_forward_copy() -> None:
             ready.synchronize()
-            for page, stage in zip(pages, pair.tensors):
+            for tensor_index, (page, stage, shape) in enumerate(
+                zip(pages, pair.tensors, shapes)
+            ):
                 if page.reusable_after is not None:
                     page.reusable_after.synchronize()
                     page.reusable_after = None
-                page.tensor.copy_(stage)
-            logical_bytes = sum(self._nbytes(page.tensor) for page in pages)
+                self._view(page.tensor, tensor_index, shape).copy_(
+                    self._view(stage, tensor_index, shape)
+                )
+            logical_bytes = sum(self._nbytes(value) for value in values)
             self.stats.cpu_forward_host_copy_entries += 1
             self.stats.cpu_forward_host_copy_bytes += logical_bytes
             self._release_stage(pair)
 
         future = self._executor.submit(finish_forward_copy)
         self._pending_forward.append(future)
-        entry = _PageableCacheEntry(block_index, pages, future, device)
+        entry = _PageableCacheEntry(block_index, pages, shapes, future, device)
         self._entries[block_index] = entry
-        logical_bytes = sum(self._nbytes(page.tensor) for page in pages)
+        logical_bytes = sum(self._nbytes(value) for value in values)
         self.stats.cpu_d2h_entries += 1
         self.stats.cpu_d2h_tensors += len(pages)
         self.stats.cpu_d2h_bytes += logical_bytes
@@ -600,12 +624,19 @@ class _PageableStagingPool:
         def prepare_stage() -> _StagePair:
             entry.forward_future.result()
             pair = self._acquire_stage()
-            for stage, page in zip(pair.tensors, entry.pages):
+            for tensor_index, (stage, page, shape) in enumerate(
+                zip(pair.tensors, entry.pages, entry.shapes)
+            ):
                 if page.reusable_after is not None:
                     page.reusable_after.synchronize()
                     page.reusable_after = None
-                stage.copy_(page.tensor)
-            logical_bytes = sum(self._nbytes(page.tensor) for page in entry.pages)
+                self._view(stage, tensor_index, shape).copy_(
+                    self._view(page.tensor, tensor_index, shape)
+                )
+            logical_bytes = sum(
+                self._nbytes(self._view(page.tensor, index, shape))
+                for index, (page, shape) in enumerate(zip(entry.pages, entry.shapes))
+            )
             self.stats.cpu_backward_host_copy_entries += 1
             self.stats.cpu_backward_host_copy_bytes += logical_bytes
             return pair
@@ -631,10 +662,13 @@ class _PageableStagingPool:
         pair = entry.backward_future.result()
         stream = torch.cuda.current_stream(entry.device)
         values = tuple(
-            torch.empty_like(page.tensor, device=entry.device) for page in entry.pages
+            torch.empty(shape, dtype=page.tensor.dtype, device=entry.device)
+            for page, shape in zip(entry.pages, entry.shapes)
         )
-        for value, stage in zip(values, pair.tensors):
-            value.copy_(stage, non_blocking=True)
+        for tensor_index, (value, stage, shape) in enumerate(
+            zip(values, pair.tensors, entry.shapes)
+        ):
+            value.copy_(self._view(stage, tensor_index, shape), non_blocking=True)
         reusable_after = torch.cuda.Event()
         reusable_after.record(stream)
         for page in entry.pages:
@@ -652,7 +686,7 @@ class _PageableStagingPool:
         next_block = self._next_lower.get(int(entry.block_index))
         if next_block is not None:
             self._prefetch_block(next_block)
-        logical_bytes = sum(self._nbytes(page.tensor) for page in entry.pages)
+        logical_bytes = sum(self._nbytes(value) for value in values)
         self.stats.cpu_h2d_entries += 1
         self.stats.cpu_h2d_tensors += len(entry.pages)
         self.stats.cpu_h2d_bytes += logical_bytes
