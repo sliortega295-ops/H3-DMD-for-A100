@@ -15,6 +15,7 @@ from h3_a100.fa3_replay_cache import (
     parse_block_indices,
     parse_max_d2h_inflight,
     parse_storage,
+    trim_allocator_before_backward,
     validate_cycle,
 )
 
@@ -35,8 +36,10 @@ def test_default_off_integration_and_parser():
     assert "enabled: false" in config
     assert "storage: cuda" in config
     assert "max_d2h_inflight: 2" in config
+    assert "trim_before_backward: false" in config
     assert "H3_FA3_REPLAY_CACHE_STORAGE" in grid
     assert "H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT" in grid
+    assert "H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD" in grid
     assert parse_block_indices(None) == ()
     assert parse_block_indices("") == ()
     assert parse_block_indices("40-42,49") == (40, 41, 42, 49)
@@ -66,6 +69,30 @@ def test_disabled_install_does_not_touch_transformer_or_kernel():
     )
     assert not registration.enabled
     assert transformer._gradient_checkpointing_func is checkpoint_fn
+
+
+def test_allocator_trim_is_default_off_and_cpu_only(monkeypatch):
+    calls = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.append("trim"))
+    stats = SimpleNamespace(allocator_trim_calls=0)
+    registration = SimpleNamespace(
+        enabled=True,
+        trim_before_backward=False,
+        storage="cpu",
+        stats=stats,
+    )
+    assert not trim_allocator_before_backward(registration)
+    assert calls == []
+    assert stats.allocator_trim_calls == 0
+
+    registration.trim_before_backward = True
+    assert trim_allocator_before_backward(registration)
+    assert calls == ["trim"]
+    assert stats.allocator_trim_calls == 1
+
+    registration.storage = "cuda"
+    with pytest.raises(RuntimeError, match="authorized only for CPU storage"):
+        trim_allocator_before_backward(registration)
 
 
 class _Block(nn.Module):

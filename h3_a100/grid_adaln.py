@@ -413,6 +413,20 @@ def install_grid_trainer_patch() -> None:
                 replay_cache.get("max_d2h_inflight", 2),
             )
         )
+        trim_value = str(
+            os.environ.get(
+                "H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD",
+                int(bool(replay_cache.get("trim_before_backward", False))),
+            )
+        ).strip().lower()
+        if trim_value not in {"0", "1", "false", "true", "no", "yes", "off", "on"}:
+            raise ValueError(
+                "H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD must be boolean, "
+                f"got {trim_value!r}"
+            )
+        self.fa3_replay_cache_trim_before_backward = trim_value in {
+            "1", "true", "yes", "on"
+        }
         self.fa3_replay_cache_registration = None
 
     def model_prepare(
@@ -489,17 +503,19 @@ def install_grid_trainer_patch() -> None:
             parent_split_registration=self.fa3_nograd_split_registration,
             storage=self.fa3_replay_cache_storage,
             max_d2h_inflight=self.fa3_replay_cache_max_d2h_inflight,
+            trim_before_backward=self.fa3_replay_cache_trim_before_backward,
         )
         self.grid_replay_registration = install_grid_checkpoint_replay_scope(
             self.shared_model.denoiser_module(), controller, expected_block_count=50
         )
         logger.info(
             "[h3-a100][fa3-replay-cache] enabled={} blocks={} storage={} "
-            "max_d2h_inflight={}",
+            "max_d2h_inflight={} trim_before_backward={}",
             self.fa3_replay_cache_registration.enabled,
             list(self.fa3_replay_cache_blocks),
             self.fa3_replay_cache_storage,
             self.fa3_replay_cache_max_d2h_inflight,
+            self.fa3_replay_cache_trim_before_backward,
         )
         return result
 

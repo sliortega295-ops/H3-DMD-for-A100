@@ -131,6 +131,9 @@ training:
       storage: cuda
       # CPU-staged mode bounds source tensors retained by asynchronous D2H.
       max_d2h_inflight: 2
+      # Default-off capacity repair: release inactive CUDA allocator segments
+      # after each grad forward and before its checkpoint replay backward.
+      trim_before_backward: false
     lora_scale1_elision:
       # Opt-in removal of PEFT's identity multiply when rank == alpha.
       enabled: false

@@ -61,6 +61,7 @@ class FA3ReplayCacheStats:
     cpu_pool_busy_waits: int = 0
     cpu_pool_busy_misses: int = 0
     cpu_d2h_backpressure_waits: int = 0
+    allocator_trim_calls: int = 0
     unexpected_cpu_storage_calls: int = 0
     unexpected_kernel_contract_calls: int = 0
     unexpected_checkpoint_contract_calls: int = 0
@@ -411,6 +412,7 @@ class FA3ReplayCacheRegistration:
     storage: str = "cuda"
     cpu_pool: _PinnedPool | None = None
     max_d2h_inflight: int = 2
+    trim_before_backward: bool = False
 
     def snapshot(self) -> dict[str, int]:
         return dataclasses.asdict(self.stats)
@@ -424,6 +426,7 @@ class FA3ReplayCacheRegistration:
             "raw_backward_schema": self.raw_backward_schema,
             "storage": self.storage,
             "max_d2h_inflight": self.max_d2h_inflight,
+            "trim_before_backward": self.trim_before_backward,
             "stats": self.snapshot(),
         }
 
@@ -473,6 +476,25 @@ def parse_max_d2h_inflight(value: int | str | None) -> int:
     return parsed
 
 
+def trim_allocator_before_backward(
+    registration: "FA3ReplayCacheRegistration | None",
+) -> bool:
+    """Release inactive allocator segments for the bounded CPU cache path."""
+    if (
+        registration is None
+        or not registration.enabled
+        or not registration.trim_before_backward
+    ):
+        return False
+    if registration.storage != "cpu":
+        raise RuntimeError(
+            "FA3 replay-cache allocator trim is authorized only for CPU storage"
+        )
+    torch.cuda.empty_cache()
+    registration.stats.allocator_trim_calls += 1
+    return True
+
+
 def _schema(value: Any) -> str | None:
     schema = getattr(value, "_schema", None)
     return None if schema is None else str(schema)
@@ -488,6 +510,7 @@ def install_fa3_replay_cache(
     raw_backward: Callable[..., Any] | None = None,
     storage: str = "cuda",
     max_d2h_inflight: int = 2,
+    trim_before_backward: bool = False,
 ) -> FA3ReplayCacheRegistration:
     """Install the exact replay cache after Grid scope and split2 wrappers."""
 
@@ -551,6 +574,7 @@ def install_fa3_replay_cache(
             _PinnedPool(stats, max_d2h_inflight) if storage == "cpu" else None
         ),
         max_d2h_inflight=max_d2h_inflight,
+        trim_before_backward=bool(trim_before_backward),
     )
     _RUNTIME = _Runtime(raw_forward, raw_backward, stats)
 
@@ -704,10 +728,11 @@ def install_fa3_replay_cache(
     logger.info(
         "[h3-a100][fa3-replay-cache] installed blocks={} storage={} "
         "max_d2h_inflight={} "
-        "cached_outputs=out+lse split=2",
+        "trim_before_backward={} cached_outputs=out+lse split=2",
         list(selected),
         storage,
         max_d2h_inflight,
+        bool(trim_before_backward),
     )
     return registration
 
@@ -730,6 +755,11 @@ def validate_cycle(
         "compact_backward_calls": selected_per_cycle,
         "unexpected_kernel_contract_calls": 0,
         "unexpected_checkpoint_contract_calls": 0,
+        "allocator_trim_calls": (
+            EXPECTED_GRAD_TRANSFORMER_FORWARDS
+            if registration.trim_before_backward
+            else 0
+        ),
         "unexpected_cpu_storage_calls": 0,
     }
     if registration.storage == "cpu":

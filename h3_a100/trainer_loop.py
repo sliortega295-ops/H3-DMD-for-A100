@@ -29,7 +29,10 @@ from .fused_qk_rmsnorm_rotary import validate_cycle as validate_fused_qk_cycle
 from .fused_rotary import validate_cycle as validate_fused_rotary_cycle
 from .fused_swiglu import validate_cycle as validate_fused_swiglu_cycle
 from .fa3_nograd_splits import validate_cycle as validate_fa3_nograd_split_cycle
-from .fa3_replay_cache import validate_cycle as validate_fa3_replay_cache_cycle
+from .fa3_replay_cache import (
+    trim_allocator_before_backward,
+    validate_cycle as validate_fa3_replay_cache_cycle,
+)
 from .lora_scale1_elision import validate_cycle as validate_lora_scale1_cycle
 from .trainer_runtime import PreparedFakeUpdate
 
@@ -158,6 +161,7 @@ class H3A100LoopMixin:
             with self._activation_offload_scope("student") as offload:
                 result = self.forward_student_loss(latent_shape, conditions, current_iter=current_iter)
                 self._log_residency("after_student_grad_forward")
+                self._maybe_trim_fa3_replay_cache_before_backward()
                 if offload is not None:
                     # Legacy thresholded offload is diagnostic only.  The
                     # production checkpoint-boundary policy is installed at
@@ -236,6 +240,7 @@ class H3A100LoopMixin:
                     self._log_residency(f"before_fake_{micro_idx}_grad_forward")
                     loss_fake = self.fake_loss(item)
                     self._log_residency(f"after_fake_{micro_idx}_grad_forward")
+                    self._maybe_trim_fa3_replay_cache_before_backward()
                     if offload is not None:
                         offload.begin_backward()
                     self.shared_model.set_transformer_training(True)
@@ -308,6 +313,19 @@ class H3A100LoopMixin:
             None
             if registration is None or not registration.enabled
             else registration.snapshot()
+        )
+
+    def _maybe_trim_fa3_replay_cache_before_backward(self) -> None:
+        """Release only inactive allocator segments before cached replay.
+
+        This is a default-off capacity repair for the CPU-staged compact FA3
+        cache. ``empty_cache`` cannot free live tensors and does not alter the
+        stream-ordered model graph; it only returns currently unused allocator
+        segments before the checkpoint backward creates its transient q/k/v
+        and FSDP working set.
+        """
+        trim_allocator_before_backward(
+            getattr(self, "fa3_replay_cache_registration", None)
         )
 
     def _begin_lora_scale1_cycle(self) -> None:
@@ -409,6 +427,7 @@ class H3A100LoopMixin:
         logger.info(
             "[h3-a100][fa3-replay-cache] iter={} rank={} blocks={} storage={} "
             "max_d2h_inflight={} "
+            "trim_before_backward={} "
             "cached_logical_gib={:.3f} d2h_gib={:.3f} h2d_gib={:.3f} "
             "pool_allocated_gib={:.3f} delta={}",
             current_iter,
@@ -416,6 +435,7 @@ class H3A100LoopMixin:
             list(registration.block_indices),
             registration.storage,
             registration.max_d2h_inflight,
+            registration.trim_before_backward,
             delta["cached_logical_bytes"] / 2**30,
             delta["cpu_d2h_bytes"] / 2**30,
             delta["cpu_h2d_bytes"] / 2**30,
