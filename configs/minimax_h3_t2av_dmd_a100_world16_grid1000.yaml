@@ -125,6 +125,10 @@ training:
       # transformer block indices through H3_FA3_REPLAY_CACHE_BLOCKS.
       enabled: false
       blocks: []
+      # cuda preserves the Iteration-401 GPU-resident implementation. The
+      # bounded CPU-staged candidate is selected explicitly through
+      # H3_FA3_REPLAY_CACHE_STORAGE=cpu.
+      storage: cuda
     lora_scale1_elision:
       # Opt-in removal of PEFT's identity multiply when rank == alpha.
       enabled: false

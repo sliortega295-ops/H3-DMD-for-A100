@@ -407,12 +407,17 @@ class H3A100LoopMixin:
             raise RuntimeError("H3 FA3 replay-cache cycle baseline is missing")
         delta = validate_fa3_replay_cache_cycle(registration, start)
         logger.info(
-            "[h3-a100][fa3-replay-cache] iter={} rank={} blocks={} "
-            "cached_logical_gib={:.3f} delta={}",
+            "[h3-a100][fa3-replay-cache] iter={} rank={} blocks={} storage={} "
+            "cached_logical_gib={:.3f} d2h_gib={:.3f} h2d_gib={:.3f} "
+            "pool_allocated_gib={:.3f} delta={}",
             current_iter,
             get_rank(),
             list(registration.block_indices),
+            registration.storage,
             delta["cached_logical_bytes"] / 2**30,
+            delta["cpu_d2h_bytes"] / 2**30,
+            delta["cpu_h2d_bytes"] / 2**30,
+            delta["cpu_pool_allocated_bytes"] / 2**30,
             delta,
         )
 

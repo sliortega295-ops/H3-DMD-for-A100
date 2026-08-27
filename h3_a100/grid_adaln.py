@@ -30,7 +30,11 @@ from loguru import logger
 from torch import nn
 
 from .adaln_cache import CacheStats
-from .fa3_replay_cache import install_fa3_replay_cache, parse_block_indices
+from .fa3_replay_cache import (
+    install_fa3_replay_cache,
+    parse_block_indices,
+    parse_storage,
+)
 
 SCHEMA_VERSION = "h3_a100.adaln_grid.v1"
 DEFAULT_GRID_SIZE = 1000
@@ -397,6 +401,11 @@ def install_grid_trainer_patch() -> None:
             self.fa3_replay_cache_blocks = parse_block_indices(configured_blocks)
         else:
             self.fa3_replay_cache_blocks = ()
+        self.fa3_replay_cache_storage = parse_storage(
+            os.environ.get(
+                "H3_FA3_REPLAY_CACHE_STORAGE", replay_cache.get("storage", "cuda")
+            )
+        )
         self.fa3_replay_cache_registration = None
 
     def model_prepare(
@@ -471,14 +480,16 @@ def install_grid_trainer_patch() -> None:
             self.shared_model.denoiser_module(),
             block_indices=self.fa3_replay_cache_blocks,
             parent_split_registration=self.fa3_nograd_split_registration,
+            storage=self.fa3_replay_cache_storage,
         )
         self.grid_replay_registration = install_grid_checkpoint_replay_scope(
             self.shared_model.denoiser_module(), controller, expected_block_count=50
         )
         logger.info(
-            "[h3-a100][fa3-replay-cache] enabled={} blocks={}",
+            "[h3-a100][fa3-replay-cache] enabled={} blocks={} storage={}",
             self.fa3_replay_cache_registration.enabled,
             list(self.fa3_replay_cache_blocks),
+            self.fa3_replay_cache_storage,
         )
         return result
 

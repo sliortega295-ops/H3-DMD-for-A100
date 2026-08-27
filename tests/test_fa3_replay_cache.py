@@ -13,6 +13,7 @@ from h3_a100.fa3_replay_cache import (
     FA3ReplayCacheStats,
     install_fa3_replay_cache,
     parse_block_indices,
+    parse_storage,
     validate_cycle,
 )
 
@@ -31,6 +32,8 @@ def test_default_off_integration_and_parser():
     assert "_validate_fa3_replay_cache_cycle" in loop
     assert "fa3_replay_cache:" in config
     assert "enabled: false" in config
+    assert "storage: cuda" in config
+    assert "H3_FA3_REPLAY_CACHE_STORAGE" in grid
     assert parse_block_indices(None) == ()
     assert parse_block_indices("") == ()
     assert parse_block_indices("40-42,49") == (40, 41, 42, 49)
@@ -38,6 +41,10 @@ def test_default_off_integration_and_parser():
         parse_block_indices("40,40")
     with pytest.raises(ValueError, match=r"\[0,49\]"):
         parse_block_indices("50")
+    assert parse_storage(None) == "cuda"
+    assert parse_storage("CPU") == "cpu"
+    with pytest.raises(ValueError, match="storage must be"):
+        parse_storage("disk")
 
 
 def test_disabled_install_does_not_touch_transformer_or_kernel():
@@ -192,4 +199,33 @@ def test_full_cycle_validator_is_fail_closed():
     assert validate_cycle(registration, {})["compact_backward_calls"] == selected
     stats.compact_backward_calls -= 1
     with pytest.raises(RuntimeError, match="compact_backward_calls"):
+        validate_cycle(registration, {})
+
+
+def test_cpu_storage_cycle_validator_reconciles_exact_transfer_bytes():
+    blocks = (0, 1)
+    selected = len(blocks) * EXPECTED_GRAD_TRANSFORMER_FORWARDS
+    logical_bytes = 456
+    stats = FA3ReplayCacheStats(
+        grad_transformer_forwards=6,
+        completed_grad_transformer_forwards=6,
+        selected_checkpoint_wraps=selected,
+        selected_scoped_executions=2 * selected,
+        compact_attention_entries=2 * selected,
+        compact_forward_impl_calls=selected,
+        compact_backward_calls=selected,
+        cached_logical_bytes=logical_bytes,
+        cpu_d2h_entries=selected,
+        cpu_h2d_entries=selected,
+        cpu_d2h_tensors=2 * selected,
+        cpu_h2d_tensors=2 * selected,
+        cpu_d2h_bytes=logical_bytes,
+        cpu_h2d_bytes=logical_bytes,
+    )
+    registration = FA3ReplayCacheRegistration(
+        True, blocks, None, None, None, None, None, None, stats, storage="cpu"
+    )
+    assert validate_cycle(registration, {})["cpu_h2d_bytes"] == logical_bytes
+    stats.cpu_h2d_bytes -= 1
+    with pytest.raises(RuntimeError, match="cpu_h2d_bytes"):
         validate_cycle(registration, {})
