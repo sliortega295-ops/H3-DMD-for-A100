@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--expected-cycles", type=int, default=50)
+    parser.add_argument("--expected-world-size", type=int, default=16)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -22,6 +23,7 @@ def main() -> None:
         args.reference,
         args.candidate,
         expected_cycles=args.expected_cycles,
+        expected_world_size=args.expected_world_size,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.output.exists():

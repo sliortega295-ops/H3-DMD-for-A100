@@ -24,7 +24,7 @@ from lightx2v_train.runtime.sequence_parallel import sync_sequence_parallel_grad
 
 from .matched_contract import FAKE_ROLE, STUDENT_ROLE, validate_global_snapshots
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER
-from .trajectory import TrajectoryRecorder
+from .trajectory import TrajectoryRecorder, reset_trajectory_rng
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -39,7 +39,6 @@ class H3A100LoopMixin:
         barrier()
 
         grad_accum_iters = max(1, int(self.gradient_accumulation_iters))
-        samples = self._iter_train_samples()
         logger.info(
             "[h3-a100] train start iter={}/{} world={} grad_accum={} fake_ratio={} reorder={}",
             current_iter,
@@ -66,13 +65,22 @@ class H3A100LoopMixin:
         if self.trajectory_recorder is not None:
             if not self.matched_compute_enabled:
                 raise RuntimeError("H3 trajectory mode requires matched_compute.enabled=true")
+            # Setup differs materially between Exact and Grid. Reset only in
+            # explicit trajectory mode, after setup and before constructing or
+            # consuming the sample iterator, so both arms start from the same
+            # rank-qualified Python/NumPy/CPU/CUDA RNG state.
+            rng_reset = reset_trajectory_rng(seed=base_seed, rank=get_rank())
+            self._trajectory_student_optimizer_updates = 0
+            self._trajectory_fake_optimizer_updates = 0
             self.trajectory_recorder.start_run(
                 current_iter=current_iter,
                 max_train_iters=self.max_train_iters,
                 named_parameters=self.shared_model.denoiser_module().named_parameters(),
                 student_parameters=self.trainable_params,
                 fake_parameters=self.fake_trainable_params,
+                rng_reset=rng_reset,
             )
+        samples = self._iter_train_samples()
 
         while current_iter < self.max_train_iters:
             cycle_index = current_iter
@@ -113,6 +121,8 @@ class H3A100LoopMixin:
                             "last_epoch", current_iter * self.fake_update_ratio
                         )
                     ),
+                    student_optimizer_updates=self._trajectory_student_optimizer_updates,
+                    fake_optimizer_updates=self._trajectory_fake_optimizer_updates,
                 )
             if current_iter == 1 or current_iter % self.train_log_every_iters == 0:
                 logger.info(
@@ -184,6 +194,8 @@ class H3A100LoopMixin:
             self.trajectory_recorder.capture_gradient("student", self.trainable_params)
         self._log_residency("before_student_optimizer")
         self.optimizer.step()
+        if self.trajectory_recorder is not None:
+            self._trajectory_student_optimizer_updates += 1
         self.lr_scheduler.step()
         self._log_residency("after_student_optimizer")
         self.optimizer.zero_grad(set_to_none=True)
@@ -261,6 +273,8 @@ class H3A100LoopMixin:
             self.trajectory_recorder.capture_gradient("fake", self.fake_trainable_params)
         self._log_residency("before_fake_optimizer")
         self.fake_optimizer.step()
+        if self.trajectory_recorder is not None:
+            self._trajectory_fake_optimizer_updates += 1
         self.fake_lr_scheduler.step()
         self._log_residency("after_fake_optimizer")
         self.fake_optimizer.zero_grad(set_to_none=True)

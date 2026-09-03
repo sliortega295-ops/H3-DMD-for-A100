@@ -25,11 +25,31 @@ case "${VARIANT}" in
   exact)
     LAUNCHER="${REPO_ROOT}/scripts/launch_2node.sh"
     export CONFIG=${CONFIG:-"${REPO_ROOT}/configs/minimax_h3_t2av_dmd_a100_world16.yaml"}
+    export H3_ATTN_BACKEND=_flash_3_hub
+    export H3_ACTIVATION_CHECKPOINT_SEGMENT=1
+    export H3_ACTIVATION_POLICY=checkpoint_boundary_cpu
+    unset H3_ACTIVATION_OFFLOAD H3_ACTIVATION_OFFLOAD_MIN_BYTES || true
+    unset H3_FA3_REPLAY_CACHE_BLOCKS H3_FA3_REPLAY_CACHE_STORAGE || true
+    unset H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD || true
+    unset H3_ADALN_GRID_MANIFEST || true
+    ARM_ID=h3-exact-continuous-boundary-cpu/v1
+    GRID_MANIFEST_SHA256=none
     ;;
   grid1000)
     LAUNCHER="${REPO_ROOT}/scripts/launch_2node_grid1000.sh"
     export CONFIG=${CONFIG:-"${REPO_ROOT}/configs/minimax_h3_t2av_dmd_a100_world16_grid1000.yaml"}
     : "${H3_ADALN_GRID_MANIFEST:?Grid trajectory requires H3_ADALN_GRID_MANIFEST}"
+    [[ -f ${H3_ADALN_GRID_MANIFEST} ]] || { echo "Missing Grid manifest" >&2; exit 2; }
+    export H3_ATTN_BACKEND=_flash_3_hub
+    export H3_ACTIVATION_CHECKPOINT_SEGMENT=1
+    export H3_ACTIVATION_POLICY=none
+    unset H3_ACTIVATION_OFFLOAD H3_ACTIVATION_OFFLOAD_MIN_BYTES || true
+    export H3_FA3_REPLAY_CACHE_BLOCKS=0-49
+    export H3_FA3_REPLAY_CACHE_STORAGE=cpu_staged
+    export H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT=2
+    export H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD=true
+    ARM_ID=h3-grid1000-iteration418/v1
+    GRID_MANIFEST_SHA256=$(sha256sum "${H3_ADALN_GRID_MANIFEST}" | awk '{print $1}')
     ;;
   *)
     echo "Unknown trajectory variant: ${VARIANT}" >&2
@@ -51,8 +71,10 @@ if [[ ${NODE_RANK} == 0 && -e ${H3_TRAJECTORY_DIR}/trajectory_manifest.json ]]; 
   exit 2
 fi
 launcher_receipt="${H3_TRAJECTORY_DIR}/launcher_node${NODE_RANK}.txt"
-if ! (set -o noclobber; printf 'head=%s\nvariant=%s\nnode_rank=%s\n' \
-  "${ACTUAL_HEAD}" "${VARIANT}" "${NODE_RANK}" >"${launcher_receipt}") 2>/dev/null; then
+if ! (set -o noclobber; printf 'head=%s\nvariant=%s\nnode_rank=%s\narm_id=%s\nattention=%s\nactivation_policy=%s\ncheckpoint_segment=%s\ngrid_manifest_sha256=%s\n' \
+  "${ACTUAL_HEAD}" "${VARIANT}" "${NODE_RANK}" "${ARM_ID}" "${H3_ATTN_BACKEND}" \
+  "${H3_ACTIVATION_POLICY}" "${H3_ACTIVATION_CHECKPOINT_SEGMENT}" "${GRID_MANIFEST_SHA256}" \
+  >"${launcher_receipt}") 2>/dev/null; then
   echo "Refusing to reuse trajectory run root; marker exists: ${launcher_receipt}" >&2
   exit 2
 fi

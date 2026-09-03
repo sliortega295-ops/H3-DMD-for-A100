@@ -12,6 +12,7 @@ from lightx2v_train.trainers.dmd.math import dmd_loss_pair, weighted_mse_pair
 
 from .matched_contract import FAKE_ROLE, STUDENT_ROLE, TEACHER_ROLE
 from .model import BASE_ROLE, FAKE_ADAPTER, STUDENT_ADAPTER
+from .trajectory import rng_state_receipt
 
 
 @dataclasses.dataclass
@@ -34,7 +35,14 @@ class H3A100RuntimeMixin:
     def sample_initial_latents(self, latent_shape):
         # Match upstream LightX2V exactly. Sequence-parallel synchronization,
         # if enabled in a future ablation, remains owned by the upstream helper.
-        return super().sample_initial_latents(latent_shape)
+        recorder = getattr(self, "trajectory_recorder", None)
+        pre_rng = rng_state_receipt() if recorder is not None else None
+        latents = super().sample_initial_latents(latent_shape)
+        if recorder is not None:
+            recorder.note_stochastic_pair(
+                kind="rollout_initial", tensors=latents, pre_rng=pre_rng
+            )
+        return latents
 
     def _sample_synced_int(self, low, high):
         if (
@@ -62,6 +70,17 @@ class H3A100RuntimeMixin:
     @staticmethod
     def _randn_like_exact(tensor):
         return torch.randn_like(tensor, dtype=torch.float32)
+
+    def _sample_score_noise_pair(self, generated):
+        recorder = getattr(self, "trajectory_recorder", None)
+        pre_rng = rng_state_receipt() if recorder is not None else None
+        noises = (
+            self._randn_like_exact(generated[0]),
+            self._randn_like_exact(generated[1]),
+        )
+        if recorder is not None:
+            recorder.note_stochastic_pair(kind="score_noise", tensors=noises, pre_rng=pre_rng)
+        return noises
 
     # ------------------------------------------------------------------
     # Role switching, compute census, and AdaLN precomputation
@@ -136,10 +155,7 @@ class H3A100RuntimeMixin:
             condition, latent_shape, end_step_idx, grad_enabled=True
         )
         sigmas = self._sample_renoise_sigmas()
-        noises = (
-            self._randn_like_exact(generated[0]),
-            self._randn_like_exact(generated[1]),
-        )
+        noises = self._sample_score_noise_pair(generated)
         renoised = self._add_noise(generated, noises, sigmas)
 
         score_key = self._next_score_key()
@@ -182,10 +198,7 @@ class H3A100RuntimeMixin:
         )
         generated = (generated[0].detach(), generated[1].detach())
         sigmas = self._sample_renoise_sigmas()
-        noises = (
-            self._randn_like_exact(generated[0]),
-            self._randn_like_exact(generated[1]),
-        )
+        noises = self._sample_score_noise_pair(generated)
         renoised = self._add_noise(generated, noises, sigmas)
         return PreparedFakeUpdate(
             latent_shape=latent_shape,
