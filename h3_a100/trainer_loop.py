@@ -35,7 +35,7 @@ from .fa3_replay_cache import (
     validate_cycle as validate_fa3_replay_cache_cycle,
 )
 from .lora_scale1_elision import validate_cycle as validate_lora_scale1_cycle
-from .trajectory import TrajectoryRecorder
+from .trajectory import TrajectoryRecorder, reset_trajectory_rng
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -50,7 +50,6 @@ class H3A100LoopMixin:
         barrier()
 
         grad_accum_iters = max(1, int(self.gradient_accumulation_iters))
-        samples = self._iter_train_samples()
         logger.info(
             "[h3-a100] train start iter={}/{} world={} grad_accum={} fake_ratio={} reorder={}",
             current_iter,
@@ -77,13 +76,18 @@ class H3A100LoopMixin:
         if self.trajectory_recorder is not None:
             if not self.matched_compute_enabled:
                 raise RuntimeError("H3 trajectory mode requires matched_compute.enabled=true")
+            rng_reset = reset_trajectory_rng(seed=base_seed, rank=get_rank())
+            self._trajectory_student_optimizer_updates = 0
+            self._trajectory_fake_optimizer_updates = 0
             self.trajectory_recorder.start_run(
                 current_iter=current_iter,
                 max_train_iters=self.max_train_iters,
                 named_parameters=self.shared_model.denoiser_module().named_parameters(),
                 student_parameters=self.trainable_params,
                 fake_parameters=self.fake_trainable_params,
+                rng_reset=rng_reset,
             )
+        samples = self._iter_train_samples()
 
         while current_iter < self.max_train_iters:
             cycle_index = current_iter
@@ -160,6 +164,8 @@ class H3A100LoopMixin:
                             "last_epoch", current_iter * self.fake_update_ratio
                         )
                     ),
+                    student_optimizer_updates=self._trajectory_student_optimizer_updates,
+                    fake_optimizer_updates=self._trajectory_fake_optimizer_updates,
                 )
             if current_iter == 1 or current_iter % self.train_log_every_iters == 0:
                 logger.info(
@@ -242,6 +248,8 @@ class H3A100LoopMixin:
             self.trajectory_recorder.capture_gradient("student", self.trainable_params)
         self._log_residency("before_student_optimizer")
         self.optimizer.step()
+        if self.trajectory_recorder is not None:
+            self._trajectory_student_optimizer_updates += 1
         self.lr_scheduler.step()
         self._log_residency("after_student_optimizer")
         self.optimizer.zero_grad(set_to_none=True)
@@ -324,6 +332,8 @@ class H3A100LoopMixin:
             self.trajectory_recorder.capture_gradient("fake", self.fake_trainable_params)
         self._log_residency("before_fake_optimizer")
         self.fake_optimizer.step()
+        if self.trajectory_recorder is not None:
+            self._trajectory_fake_optimizer_updates += 1
         self.fake_lr_scheduler.step()
         self._log_residency("after_fake_optimizer")
         self.fake_optimizer.zero_grad(set_to_none=True)

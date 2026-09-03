@@ -14,6 +14,7 @@ import importlib.metadata
 import json
 import math
 import os
+import random
 import struct
 import subprocess
 from dataclasses import asdict, dataclass
@@ -22,10 +23,70 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import torch
 
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - LightX2V installs NumPy in production.
+    np = None
+
 COARSE_SCHEMA = "h3-trajectory-coarse/v1"
 MODE_NAME = "coarse_v1"
 SIGMA_OPERATIONS = ("student", "fake_0", "fake_1", "fake_2", "fake_3", "fake_4")
 DEFAULT_ANCHORS = (1, 10, 25, 50)
+EXPECTED_WORLD_SIZE = 16
+EXPECTED_FORWARD_COUNTS = {"student": 24, "fake": 6, "teacher": 1}
+EXPECTED_GRAD_FORWARD_COUNTS = {"student": 1, "fake": 5, "teacher": 0}
+EXPECTED_BACKWARD_COUNTS = {"student": 1, "fake": 5}
+EXPECTED_SAMPLE_STAGES = ["student", "fake_0", "fake_1", "fake_2", "fake_3", "fake_4"]
+
+
+def expected_anchors(cycles: int) -> tuple[int, ...]:
+    cycles = int(cycles)
+    if cycles == 1:
+        return (1,)
+    if cycles == 5:
+        return (1, 5)
+    if cycles == 50:
+        return DEFAULT_ANCHORS
+    return (1, cycles)
+
+
+def _bytes_sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def rng_state_receipt() -> dict[str, Any]:
+    """Return small, auditable fingerprints without advancing any RNG."""
+
+    cpu_state = torch.random.get_rng_state().detach().cpu().numpy().tobytes()
+    cuda_sha = None
+    cuda_device = None
+    if torch.cuda.is_available():
+        cuda_device = int(torch.cuda.current_device())
+        cuda_state = torch.cuda.get_rng_state(cuda_device).detach().cpu().numpy().tobytes()
+        cuda_sha = _bytes_sha256(cuda_state)
+    numpy_sha = None
+    if np is not None:
+        numpy_sha = _bytes_sha256(repr(np.random.get_state()).encode())
+    return {
+        "python_sha256": _bytes_sha256(repr(random.getstate()).encode()),
+        "numpy_sha256": numpy_sha,
+        "torch_cpu_sha256": _bytes_sha256(cpu_state),
+        "torch_cuda_device": cuda_device,
+        "torch_cuda_sha256": cuda_sha,
+    }
+
+
+def reset_trajectory_rng(*, seed: int, rank: int) -> dict[str, Any]:
+    """Reset RNG only after setup so Exact/Grid consume the same training stream."""
+
+    rank_seed = int(seed) + int(rank)
+    random.seed(rank_seed)
+    if np is not None:
+        np.random.seed(rank_seed % (2**32))
+    torch.manual_seed(rank_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(rank_seed)
+    return {"base_seed": int(seed), "rank_seed": rank_seed, "state": rng_state_receipt()}
 
 
 def _f32(value: float) -> float:
@@ -162,6 +223,61 @@ def runtime_identity(*, variant: str) -> dict[str, Any]:
         except importlib.metadata.PackageNotFoundError:
             return "UNRESOLVED"
 
+    checkpoint_segment = int(os.environ.get("H3_ACTIVATION_CHECKPOINT_SEGMENT", "1"))
+    activation_policy = os.environ.get("H3_ACTIVATION_POLICY", "config_default")
+    if variant == "exact":
+        arm_contract = {
+            "arm_id": "h3-exact-continuous-boundary-cpu/v1",
+            "attention_backend": "_flash_3_hub",
+            "checkpoint_segment": 1,
+            "activation_policy": "checkpoint_boundary_cpu",
+            "fa3_replay_cache": "disabled",
+        }
+        observed = {
+            "attention_backend": os.environ.get("H3_ATTN_BACKEND", ""),
+            "checkpoint_segment": checkpoint_segment,
+            "activation_policy": activation_policy,
+            "fa3_replay_cache": (
+                "enabled" if os.environ.get("H3_FA3_REPLAY_CACHE_BLOCKS", "").strip() else "disabled"
+            ),
+        }
+    elif variant == "grid1000":
+        arm_contract = {
+            "arm_id": "h3-grid1000-iteration418/v1",
+            "attention_backend": "_flash_3_hub",
+            "checkpoint_segment": 1,
+            "activation_policy": "none",
+            "fa3_replay_cache_blocks": "0-49",
+            "fa3_replay_cache_storage": "cpu_staged",
+            "fa3_replay_cache_max_d2h_inflight": 2,
+            "fa3_replay_cache_trim_before_backward": True,
+        }
+        observed = {
+            "attention_backend": os.environ.get("H3_ATTN_BACKEND", ""),
+            "checkpoint_segment": checkpoint_segment,
+            "activation_policy": activation_policy,
+            "fa3_replay_cache_blocks": os.environ.get("H3_FA3_REPLAY_CACHE_BLOCKS", ""),
+            "fa3_replay_cache_storage": os.environ.get("H3_FA3_REPLAY_CACHE_STORAGE", ""),
+            "fa3_replay_cache_max_d2h_inflight": int(
+                os.environ.get("H3_FA3_REPLAY_CACHE_MAX_D2H_INFLIGHT", "-1")
+            ),
+            "fa3_replay_cache_trim_before_backward": os.environ.get(
+                "H3_FA3_REPLAY_CACHE_TRIM_BEFORE_BACKWARD", ""
+            ).strip().lower() in {"1", "true", "yes", "on"},
+        }
+        if grid_manifest is None or _sha256(grid_manifest) is None:
+            raise RuntimeError("Grid1000 trajectory requires a readable immutable grid manifest")
+    else:
+        raise ValueError(f"unknown trajectory variant {variant!r}")
+    expected_observed = {key: value for key, value in arm_contract.items() if key != "arm_id"}
+    mismatches = {
+        key: {"expected": expected, "observed": observed.get(key)}
+        for key, expected in expected_observed.items()
+        if observed.get(key) != expected
+    }
+    if mismatches:
+        raise RuntimeError(f"trajectory arm policy mismatch for {variant}: {mismatches}")
+
     return {
         "source_head": _repo_head(),
         "source_expected_head": os.environ.get("H3_EXPECTED_HEAD", "NOT_PROVIDED"),
@@ -172,6 +288,7 @@ def runtime_identity(*, variant: str) -> dict[str, Any]:
         "torch_cuda": str(torch.version.cuda),
         "diffusers": package_version("diffusers"),
         "peft": package_version("peft"),
+        "arm_contract": arm_contract,
         "config_path": str(config_path) if config_path else "NOT_PROVIDED",
         "config_sha256": _sha256(config_path) if config_path else None,
         "model_root": str(model_root) if model_root else "NOT_PROVIDED",
@@ -185,8 +302,8 @@ def runtime_identity(*, variant: str) -> dict[str, Any]:
         "grid_manifest": str(grid_manifest) if grid_manifest else None,
         "grid_manifest_sha256": _sha256(grid_manifest) if grid_manifest else None,
         "attention_backend": os.environ.get("H3_ATTN_BACKEND", "_flash_3_hub"),
-        "activation_policy": os.environ.get("H3_ACTIVATION_POLICY", "config_default"),
-        "checkpoint_segment": int(os.environ.get("H3_ACTIVATION_CHECKPOINT_SEGMENT", "1")),
+        "activation_policy": activation_policy,
+        "checkpoint_segment": checkpoint_segment,
         "h3_environment": {
             key: value
             for key, value in sorted(os.environ.items())
@@ -309,6 +426,11 @@ class TrajectoryRecorder:
         self._sigma_samples: list[SigmaSample] = []
         self._losses: dict[str, list[torch.Tensor]] = {"student": [], "fake": []}
         self._gradients: dict[str, list[dict[str, Any]]] = {"student": [], "fake": []}
+        self._stochastic: dict[str, list[dict[str, Any]]] = {
+            "rollout_initial": [],
+            "score_noise": [],
+        }
+        self._cycle_rng_start: dict[str, Any] | None = None
         self._named_parameter_by_id: dict[int, str] = {}
         self._initial_samples: dict[str, tuple[list[str], list[float]]] = {}
         self._records_written = 0
@@ -382,6 +504,7 @@ class TrajectoryRecorder:
         named_parameters: Mapping[str, torch.Tensor] | Iterable[tuple[str, torch.Tensor]],
         student_parameters: Sequence[torch.Tensor],
         fake_parameters: Sequence[torch.Tensor],
+        rng_reset: Mapping[str, Any],
     ) -> None:
         if int(current_iter) != 0:
             raise RuntimeError("50-cycle trajectory evidence requires a fresh restart at iteration 0")
@@ -397,6 +520,8 @@ class TrajectoryRecorder:
                 samples_per_tensor=self.samples_per_tensor,
                 max_tensors=self.max_tensors_per_role,
             )
+            if not coords or not values:
+                raise RuntimeError(f"trajectory {role} initial trainable-state inventory is empty")
             self._initial_samples[role] = (coords, values)
         start = {
             "record_type": "run_start",
@@ -404,6 +529,7 @@ class TrajectoryRecorder:
             "world_size": self.world_size,
             "variant": self.variant,
             "seed": self.seed,
+            "post_setup_rng_reset": dict(rng_reset),
             "expected_cycles": self.expected_cycles,
             "anchors": list(self.anchors),
             "state_sketch": {
@@ -435,6 +561,44 @@ class TrajectoryRecorder:
         self._sigma_samples = []
         self._losses = {"student": [], "fake": []}
         self._gradients = {"student": [], "fake": []}
+        self._stochastic = {"rollout_initial": [], "score_noise": []}
+        self._cycle_rng_start = rng_state_receipt()
+
+    def note_stochastic_pair(
+        self,
+        *,
+        kind: str,
+        tensors: Sequence[torch.Tensor],
+        pre_rng: Mapping[str, Any],
+    ) -> None:
+        """Record a tiny value sketch plus pre/post RNG fingerprints per logical op."""
+
+        if self._cycle is None:
+            raise RuntimeError("trajectory stochastic tensor sampled outside an active cycle")
+        if kind not in self._stochastic:
+            raise ValueError(f"unknown trajectory stochastic kind {kind!r}")
+        slot = len(self._stochastic[kind])
+        operation = OperationKeyedSigmaSampler.operation_name(slot)
+        if len(tensors) != 2:
+            raise RuntimeError(f"trajectory {kind} expected video/audio pair, got {len(tensors)}")
+        coordinates, values = _sample_named_tensors(
+            (("video", tensors[0]), ("audio", tensors[1])),
+            samples_per_tensor=8,
+            max_tensors=2,
+        )
+        summary = _summarize_values(coordinates, values)
+        if summary["sample_count"] == 0:
+            raise RuntimeError(f"trajectory {kind} produced an empty tensor sketch")
+        self._stochastic[kind].append(
+            {
+                "operation": operation,
+                "pre_rng": dict(pre_rng),
+                "post_rng": rng_state_receipt(),
+                "tensor": summary,
+                "shapes": [list(tensor.shape) for tensor in tensors],
+                "dtypes": [str(tensor.dtype) for tensor in tensors],
+            }
+        )
 
     def sample_renoise_sigmas(
         self,
@@ -486,6 +650,8 @@ class TrajectoryRecorder:
             samples_per_tensor=self.samples_per_tensor,
             max_tensors=self.max_tensors_per_role,
         )
+        if not coords or not values:
+            raise RuntimeError(f"trajectory {role} parameter inventory is empty")
         self._gradients[role].append(_summarize_values(coords, values))
 
     def _state_anchor(
@@ -509,6 +675,10 @@ class TrajectoryRecorder:
             "gradient": self._gradients[role][0] if role == "student" else self._gradients[role],
             "parameter_delta": _summarize_values(coords, delta),
         }
+        gradients = result["gradient"] if role == "student" else result["gradient"]
+        gradient_rows = [gradients] if role == "student" else list(gradients)
+        if not gradient_rows or any(int(row.get("sample_count", 0)) <= 0 for row in gradient_rows):
+            raise RuntimeError(f"trajectory {role} gradient inventory is empty")
         parameter_name = {id(parameter): name for name, parameter in named}
         for key in ("exp_avg", "exp_avg_sq"):
             state_tensors = []
@@ -521,6 +691,8 @@ class TrajectoryRecorder:
                 samples_per_tensor=self.samples_per_tensor,
                 max_tensors=self.max_tensors_per_role,
             )
+            if not state_coords or not state_values:
+                raise RuntimeError(f"trajectory {role} Adam {key} inventory is empty")
             result[f"adam_{key}"] = _summarize_values(state_coords, state_values)
         return result
 
@@ -541,6 +713,8 @@ class TrajectoryRecorder:
         fake_optimizer: torch.optim.Optimizer,
         student_scheduler_steps: int,
         fake_scheduler_steps: int,
+        student_optimizer_updates: int,
+        fake_optimizer_updates: int,
         local_dmd: Sequence[torch.Tensor] | None = None,
         local_fake: Sequence[torch.Tensor] | None = None,
     ) -> None:
@@ -555,6 +729,24 @@ class TrajectoryRecorder:
         if len(dmd_values) != 1 or len(fake_values) != 5:
             raise RuntimeError(
                 f"trajectory cycle {cycle} loss inventory is Student={len(dmd_values)} Fake={len(fake_values)}; expected 1/5"
+            )
+        for kind, rows in self._stochastic.items():
+            operations = [row["operation"] for row in rows]
+            if operations != list(SIGMA_OPERATIONS):
+                raise RuntimeError(
+                    f"trajectory cycle {cycle} {kind} operations={operations}; "
+                    f"expected={list(SIGMA_OPERATIONS)}"
+                )
+        expected_student_updates = int(cycle) + 1
+        expected_fake_updates = expected_student_updates * 5
+        if int(student_optimizer_updates) != expected_student_updates:
+            raise RuntimeError(
+                f"observed Student optimizer updates={student_optimizer_updates}, "
+                f"expected={expected_student_updates}"
+            )
+        if int(fake_optimizer_updates) != expected_fake_updates:
+            raise RuntimeError(
+                f"observed Fake optimizer updates={fake_optimizer_updates}, expected={expected_fake_updates}"
             )
         anchor = None
         if cycle + 1 in self.anchors:
@@ -587,9 +779,14 @@ class TrajectoryRecorder:
                 },
                 "sigmas": [sample.as_dict() for sample in self._sigma_samples],
                 "matched_compute": dict(matched_snapshot),
+                "rng": {
+                    "cycle_start": self._cycle_rng_start,
+                    "cycle_end": rng_state_receipt(),
+                    "stochastic": self._stochastic,
+                },
                 "versions": {
-                    "student_optimizer_updates": int(cycle) + 1,
-                    "fake_optimizer_updates": (int(cycle) + 1) * 5,
+                    "student_optimizer_updates": int(student_optimizer_updates),
+                    "fake_optimizer_updates": int(fake_optimizer_updates),
                     "student_scheduler_steps": int(student_scheduler_steps),
                     "fake_scheduler_steps": int(fake_scheduler_steps),
                     "ema_updates": 0,
@@ -620,31 +817,194 @@ class TrajectoryRecorder:
         )
 
 
-def _read_cycle_rows(root: Path) -> dict[int, list[dict[str, Any]]]:
-    result: dict[int, list[dict[str, Any]]] = {}
-    for path in sorted(Path(root).glob("rank_*.trajectory.jsonl")):
+def _summary_nonempty(value: Mapping[str, Any], label: str) -> None:
+    if int(value.get("sample_count", 0)) <= 0 or not value.get("coordinates") or not value.get("values"):
+        raise RuntimeError(f"{label} state inventory is empty")
+
+
+def _validate_state_anchor(anchor: Mapping[str, Any], *, rank: int, cycle: int) -> None:
+    for role in ("student", "fake"):
+        state = anchor.get(role)
+        if not isinstance(state, Mapping):
+            raise RuntimeError(f"rank {rank} cycle {cycle} missing {role} state anchor")
+        gradients = state.get("gradient")
+        gradient_rows = [gradients] if role == "student" else gradients
+        expected = 1 if role == "student" else 5
+        if not isinstance(gradient_rows, list) or len(gradient_rows) != expected:
+            raise RuntimeError(
+                f"rank {rank} cycle {cycle} {role} gradient inventory count mismatch"
+            )
+        for index, summary in enumerate(gradient_rows):
+            if not isinstance(summary, Mapping):
+                raise RuntimeError(f"rank {rank} cycle {cycle} invalid {role} gradient {index}")
+            _summary_nonempty(summary, f"rank {rank} cycle {cycle} {role} gradient {index}")
+        for key in ("parameter_delta", "adam_exp_avg", "adam_exp_avg_sq"):
+            summary = state.get(key)
+            if not isinstance(summary, Mapping):
+                raise RuntimeError(f"rank {rank} cycle {cycle} missing {role} {key}")
+            _summary_nonempty(summary, f"rank {rank} cycle {cycle} {role} {key}")
+
+
+def _validate_cycle_row(row: Mapping[str, Any], *, rank: int, ordinal: int, anchors: set[int]) -> None:
+    if int(row.get("rank", -1)) != rank or int(row.get("cycle", -1)) != ordinal:
+        raise RuntimeError(f"rank {rank} cycle sequence is not exactly 1..N")
+    matched = row.get("matched_compute")
+    if not isinstance(matched, Mapping):
+        raise RuntimeError(f"rank {rank} cycle {ordinal} missing matched-compute receipt")
+    if int(matched.get("fixed_end_step_idx", -1)) != 3:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} fixed end-step mismatch")
+    if matched.get("forward_counts") != EXPECTED_FORWARD_COUNTS:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} application forward census mismatch")
+    if matched.get("grad_forward_counts") != EXPECTED_GRAD_FORWARD_COUNTS:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} grad-forward census mismatch")
+    if matched.get("backward_counts") != EXPECTED_BACKWARD_COUNTS:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} backward census mismatch")
+    samples = matched.get("samples")
+    if not isinstance(samples, list) or [item.get("stage") for item in samples] != EXPECTED_SAMPLE_STAGES:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} sample-stage inventory mismatch")
+    versions = row.get("versions")
+    expected_versions = {
+        "student_optimizer_updates": ordinal,
+        "fake_optimizer_updates": ordinal * 5,
+        "ema_updates": 0,
+    }
+    if not isinstance(versions, Mapping) or any(
+        int(versions.get(key, -1)) != value for key, value in expected_versions.items()
+    ):
+        raise RuntimeError(f"rank {rank} cycle {ordinal} observed update counters mismatch")
+    sigmas = row.get("sigmas")
+    if not isinstance(sigmas, list) or len(sigmas) != len(SIGMA_OPERATIONS):
+        raise RuntimeError(f"rank {rank} cycle {ordinal} sigma inventory mismatch")
+    rng = row.get("rng")
+    if not isinstance(rng, Mapping) or not isinstance(rng.get("cycle_start"), Mapping) or not isinstance(rng.get("cycle_end"), Mapping):
+        raise RuntimeError(f"rank {rank} cycle {ordinal} missing RNG boundary receipts")
+    stochastic = rng.get("stochastic")
+    if not isinstance(stochastic, Mapping):
+        raise RuntimeError(f"rank {rank} cycle {ordinal} missing stochastic receipts")
+    for kind in ("rollout_initial", "score_noise"):
+        events = stochastic.get(kind)
+        if not isinstance(events, list) or [event.get("operation") for event in events] != list(SIGMA_OPERATIONS):
+            raise RuntimeError(f"rank {rank} cycle {ordinal} {kind} inventory mismatch")
+        for event in events:
+            if not isinstance(event.get("pre_rng"), Mapping) or not isinstance(event.get("post_rng"), Mapping):
+                raise RuntimeError(f"rank {rank} cycle {ordinal} {kind} RNG receipt missing")
+            tensor = event.get("tensor")
+            if not isinstance(tensor, Mapping):
+                raise RuntimeError(f"rank {rank} cycle {ordinal} {kind} tensor receipt missing")
+            _summary_nonempty(tensor, f"rank {rank} cycle {ordinal} {kind}")
+    anchor = row.get("state_anchor")
+    if ordinal in anchors:
+        if not isinstance(anchor, Mapping):
+            raise RuntimeError(f"rank {rank} cycle {ordinal} required state anchor missing")
+        _validate_state_anchor(anchor, rank=rank, cycle=ordinal)
+    elif anchor is not None:
+        raise RuntimeError(f"rank {rank} cycle {ordinal} unexpected state anchor")
+
+
+def _load_complete_root(
+    root: Path, *, expected_cycles: int, expected_world_size: int
+) -> tuple[dict[int, list[dict[str, Any]]], dict[int, dict[str, Any]]]:
+    root = Path(root)
+    paths = sorted(root.glob("rank_*.trajectory.jsonl"))
+    expected_paths = {root / f"rank_{rank:03d}.trajectory.jsonl" for rank in range(expected_world_size)}
+    if set(paths) != expected_paths:
+        missing = sorted(str(path.name) for path in expected_paths - set(paths))
+        extra = sorted(str(path.name) for path in set(paths) - expected_paths)
+        raise RuntimeError(f"trajectory world is incomplete: missing={missing} extra={extra}")
+    cycles_by_rank: dict[int, list[dict[str, Any]]] = {}
+    starts: dict[int, dict[str, Any]] = {}
+    anchors = set(expected_anchors(expected_cycles))
+    variants: set[str] = set()
+    all_cycle_identities: dict[int, list[str]] = {cycle: [] for cycle in range(1, expected_cycles + 1)}
+    for rank, path in enumerate(sorted(expected_paths)):
         rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-        cycles = [row for row in rows if row.get("record_type") == "cycle"]
-        if not cycles:
-            continue
-        rank = int(cycles[0]["rank"])
-        result[rank] = cycles
-    if not result:
-        raise RuntimeError(f"no trajectory cycle receipts found under {root}")
-    return result
-
-
-def _read_start_rows(root: Path) -> dict[int, dict[str, Any]]:
-    result: dict[int, dict[str, Any]] = {}
-    for path in sorted(Path(root).glob("rank_*.trajectory.jsonl")):
-        for line in path.read_text().splitlines():
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            if row.get("record_type") == "run_start":
-                result[int(row["rank"])] = row
-                break
-    return result
+        expected_records = expected_cycles + 2
+        if len(rows) != expected_records:
+            raise RuntimeError(f"rank {rank} records={len(rows)}, expected={expected_records}")
+        if [row.get("record_type") for row in rows] != ["run_start"] + ["cycle"] * expected_cycles + ["run_end"]:
+            raise RuntimeError(f"rank {rank} must contain exactly one start, cycles, and one end")
+        start, *middle, end = rows
+        if int(start.get("rank", -1)) != rank or int(start.get("world_size", -1)) != expected_world_size:
+            raise RuntimeError(f"rank {rank} start identity/world mismatch")
+        if int(start.get("expected_cycles", -1)) != expected_cycles or tuple(start.get("anchors", ())) != expected_anchors(expected_cycles):
+            raise RuntimeError(f"rank {rank} declared cycles/anchors mismatch")
+        if not isinstance(start.get("post_setup_rng_reset"), Mapping):
+            raise RuntimeError(f"rank {rank} missing post-setup RNG reset receipt")
+        initial = start.get("initial_state")
+        if not isinstance(initial, Mapping):
+            raise RuntimeError(f"rank {rank} missing initial trainable state")
+        for role in ("student", "fake"):
+            if not isinstance(initial.get(role), Mapping):
+                raise RuntimeError(f"rank {rank} missing initial {role} state")
+            _summary_nonempty(initial[role], f"rank {rank} initial {role}")
+        identity = start.get("identity")
+        if not isinstance(identity, Mapping):
+            raise RuntimeError(f"rank {rank} missing runtime identity")
+        for key in ("python", "torch", "torch_cuda", "diffusers", "peft", "arm_contract"):
+            if identity.get(key) in (None, "", "UNRESOLVED"):
+                raise RuntimeError(f"rank {rank} runtime identity missing {key}")
+        variant = str(start.get("variant"))
+        expected_arm = (
+            {
+                "arm_id": "h3-exact-continuous-boundary-cpu/v1",
+                "attention_backend": "_flash_3_hub",
+                "checkpoint_segment": 1,
+                "activation_policy": "checkpoint_boundary_cpu",
+                "fa3_replay_cache": "disabled",
+            }
+            if variant == "exact"
+            else {
+                "arm_id": "h3-grid1000-iteration418/v1",
+                "attention_backend": "_flash_3_hub",
+                "checkpoint_segment": 1,
+                "activation_policy": "none",
+                "fa3_replay_cache_blocks": "0-49",
+                "fa3_replay_cache_storage": "cpu_staged",
+                "fa3_replay_cache_max_d2h_inflight": 2,
+                "fa3_replay_cache_trim_before_backward": True,
+            }
+            if variant == "grid1000"
+            else None
+        )
+        if expected_arm is None or identity.get("arm_contract") != expected_arm:
+            raise RuntimeError(f"rank {rank} has an unregistered {variant} arm policy")
+        if variant == "grid1000" and not identity.get("grid_manifest_sha256"):
+            raise RuntimeError(f"rank {rank} Grid1000 manifest identity is missing")
+        if variant == "exact" and identity.get("grid_manifest_sha256") is not None:
+            raise RuntimeError(f"rank {rank} Exact arm unexpectedly declares a Grid manifest")
+        variants.add(variant)
+        for ordinal, row in enumerate(middle, 1):
+            if row.get("variant") != variant or int(row.get("world_size", -1)) != expected_world_size:
+                raise RuntimeError(f"rank {rank} cycle {ordinal} identity mismatch")
+            _validate_cycle_row(row, rank=rank, ordinal=ordinal, anchors=anchors)
+            all_cycle_identities[ordinal].extend(
+                str(item["identity"]) for item in row["matched_compute"]["samples"]
+            )
+        if (
+            int(end.get("rank", -1)) != rank
+            or int(end.get("world_size", -1)) != expected_world_size
+            or int(end.get("completed_cycles", -1)) != expected_cycles
+            or end.get("variant") != variant
+            or end.get("status") != "COMPLETE"
+        ):
+            raise RuntimeError(f"rank {rank} run_end is incomplete")
+        starts[rank] = start
+        cycles_by_rank[rank] = middle
+    if len(variants) != 1:
+        raise RuntimeError(f"trajectory root mixes variants: {sorted(variants)}")
+    for cycle, identities in all_cycle_identities.items():
+        if len(identities) != expected_world_size * 6 or len(set(identities)) != len(identities):
+            raise RuntimeError(f"cycle {cycle} does not contain 96 rank-qualified unique samples")
+    manifest_path = root / "trajectory_manifest.json"
+    if not manifest_path.is_file():
+        raise RuntimeError(f"trajectory manifest is missing under {root}")
+    manifest = json.loads(manifest_path.read_text())
+    if manifest != starts[0]:
+        raise RuntimeError("trajectory manifest does not exactly match rank-0 run_start")
+    canonical_identity = starts[0]["identity"]
+    if any(start["identity"] != canonical_identity for start in starts.values()):
+        raise RuntimeError("runtime identity differs across ranks")
+    return cycles_by_rank, starts
 
 
 def _curve(rows: dict[int, list[dict[str, Any]]], key: str, fake_index: int | None = None):
@@ -776,14 +1136,17 @@ def _state_structure_matches(left: Any, right: Any) -> bool:
 def _identity_contract(
     reference_start: dict[int, dict[str, Any]], candidate_start: dict[int, dict[str, Any]]
 ) -> dict[str, Any]:
-    if not reference_start or not candidate_start:
-        return {"available": False, "common_runtime_identity_match": None, "seed_match": None}
     common_keys = (
         "upstream_lightx2v",
         "model_config_sha256",
         "prompt_metadata_sha256",
         "attention_backend",
         "checkpoint_segment",
+        "python",
+        "torch",
+        "torch_cuda",
+        "diffusers",
+        "peft",
     )
     mismatches = []
     seed_match = True
@@ -828,12 +1191,26 @@ def _identity_contract(
 
 
 def compare_trajectory_roots(
-    reference_root: Path, candidate_root: Path, *, expected_cycles: int = 50
+    reference_root: Path,
+    candidate_root: Path,
+    *,
+    expected_cycles: int = 50,
+    expected_world_size: int = EXPECTED_WORLD_SIZE,
 ) -> dict[str, Any]:
-    reference = _read_cycle_rows(Path(reference_root))
-    candidate = _read_cycle_rows(Path(candidate_root))
-    reference_start = _read_start_rows(Path(reference_root))
-    candidate_start = _read_start_rows(Path(candidate_root))
+    if int(expected_world_size) != EXPECTED_WORLD_SIZE:
+        raise RuntimeError(
+            f"formal H3 trajectory comparison requires exact world16, got {expected_world_size}"
+        )
+    reference, reference_start = _load_complete_root(
+        Path(reference_root),
+        expected_cycles=expected_cycles,
+        expected_world_size=expected_world_size,
+    )
+    candidate, candidate_start = _load_complete_root(
+        Path(candidate_root),
+        expected_cycles=expected_cycles,
+        expected_world_size=expected_world_size,
+    )
     ranks_match = set(reference) == set(candidate)
     declared_world_size = len(reference)
     if reference_start:
@@ -846,6 +1223,11 @@ def compare_trajectory_roots(
     )
     reference_variant = next(iter(reference.values()))[0]["variant"]
     candidate_variant = next(iter(candidate.values()))[0]["variant"]
+    if reference_variant != "exact" or candidate_variant != "grid1000":
+        raise RuntimeError(
+            "H3 trajectory comparator requires reference=exact and candidate=grid1000; "
+            f"got {reference_variant}/{candidate_variant}"
+        )
     approximation = reference_variant == "exact" and candidate_variant == "grid1000"
     samples_match = True
     operation_keys_match = True
@@ -859,6 +1241,20 @@ def compare_trajectory_roots(
     state_rows = []
     state_coordinates_match = True
     state_structure_match = True
+    stochastic_receipts_match = True
+    initial_state_match = True
+    initial_state_rows = []
+    for rank in range(expected_world_size):
+        left_initial = reference_start[rank]["initial_state"]
+        right_initial = candidate_start[rank]["initial_state"]
+        initial_state_match &= _state_structure_matches(left_initial, right_initial)
+        for state_path, left_summary, right_summary in _walk_state_summaries(
+            left_initial, right_initial, path="initial_state"
+        ):
+            metrics = _summary_metric(left_summary, right_summary)
+            initial_state_match &= bool(metrics["coordinates_match"])
+            initial_state_match &= left_summary.get("sha256") == right_summary.get("sha256")
+            initial_state_rows.append({"rank": rank, "path": state_path, **metrics})
     for rank in sorted(set(reference) & set(candidate)):
         for left, right in zip(reference[rank], candidate[rank]):
             cycle_ordinals_match &= int(left["cycle"]) == int(right["cycle"])
@@ -875,6 +1271,7 @@ def compare_trajectory_roots(
                     "matched_compute"
                 ].get(key)
             update_versions_match &= left.get("versions") == right.get("versions")
+            stochastic_receipts_match &= left.get("rng") == right.get("rng")
             sigma_inventory_match &= len(left["sigmas"]) == len(right["sigmas"]) == 6
             for left_sigma, right_sigma in zip(left["sigmas"], right["sigmas"]):
                 operation_keys_match &= left_sigma["operation_key"] == right_sigma["operation_key"]
@@ -949,6 +1346,8 @@ def compare_trajectory_roots(
         "sample_identity_match": samples_match,
         "compute_census_match": compute_census_match,
         "logical_update_versions_match": update_versions_match,
+        "post_setup_rng_and_stochastic_receipts_match": stochastic_receipts_match,
+        "initial_trainable_state_match": initial_state_match,
         "operation_keys_match": operation_keys_match,
         "sigma_inventory_match": sigma_inventory_match,
         "operation_keyed_continuous_sigma_match": continuous_match,
@@ -965,20 +1364,21 @@ def compare_trajectory_roots(
             "candidate_rank_identity_consistent"
         ),
     }
-    contract_pass = all(value is not False for value in contract.values())
+    contract_pass = all(value is True or value is None for value in contract.values())
+    suffix = f"{expected_cycles}C"
     if not contract_pass:
-        status = "CONTRACT_MISMATCH_50C_COMPLETED"
+        status = f"CONTRACT_MISMATCH_{suffix}_COMPLETED"
     elif approximation:
         status = (
-            "APPROXIMATION_CURVE_CLOSE_50C_SINGLE_SEED"
+            f"APPROXIMATION_CURVE_CLOSE_{suffix}_SINGLE_SEED"
             if soft_curve_pass and soft_state_pass
-            else "APPROXIMATION_TRAJECTORY_REVIEW_50C_COMPLETED"
+            else f"APPROXIMATION_TRAJECTORY_REVIEW_{suffix}_COMPLETED"
         )
     else:
         status = (
-            "TRAJECTORY_MATCHED_50C_SINGLE_SEED"
+            f"TRAJECTORY_MATCHED_{suffix}_SINGLE_SEED"
             if soft_curve_pass and soft_state_pass
-            else "TRAJECTORY_REVIEW_50C_COMPLETED"
+            else f"TRAJECTORY_REVIEW_{suffix}_COMPLETED"
         )
     return {
         "schema": "h3-trajectory-comparison/v1",
@@ -991,6 +1391,10 @@ def compare_trajectory_roots(
         "expected_cycles": expected_cycles,
         "contract": contract,
         "identity": identity,
+        "initial_state": {
+            "exact_sample_hash_match": initial_state_match,
+            "rows": initial_state_rows,
+        },
         "soft_thresholds": {
             "loss_normalized_rmse_max": 0.10,
             "loss_moving_average_pearson_min": 0.95,
