@@ -178,9 +178,13 @@ def test_exact_vs_grid_comparison_validates_continuous_to_snap_alignment(tmp_pat
     assert report["status"].startswith("APPROXIMATION_")
 
 
-def test_trajectory_launcher_fixes_50_cycles_without_online_numerical_stop():
+def test_trajectory_launcher_defaults_to_50_and_allows_bounded_canaries():
     source = (Path(__file__).parents[1] / "scripts" / "launch_trajectory_50c.sh").read_text()
-    assert "export H3_MAX_ITERS=50" in source
-    assert "H3_TRAJECTORY_EXPECTED_CYCLES=50" in source
+    assert "H3_TRAJECTORY_CYCLES=${H3_TRAJECTORY_CYCLES:-50}" in source
+    assert 'export H3_MAX_ITERS="${H3_TRAJECTORY_CYCLES}"' in source
+    assert 'export H3_TRAJECTORY_EXPECTED_CYCLES="${H3_TRAJECTORY_CYCLES}"' in source
+    assert "1) DEFAULT_TRAJECTORY_ANCHORS=1" in source
+    assert "5) DEFAULT_TRAJECTORY_ANCHORS=1,5" in source
+    assert "50) DEFAULT_TRAJECTORY_ANCHORS=1,10,25,50" in source
     assert "early_stop" not in source.lower()
     assert "cosine" not in source.lower()
