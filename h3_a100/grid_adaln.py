@@ -375,6 +375,7 @@ def install_grid_trainer_patch() -> None:
 
     def trainer_init(self, config):
         original_trainer_init(self, config)
+        self.trajectory_variant = "grid1000"
         grid = self.training_config.get("a100", {}).get("adaln_grid", {})
         replay_cache = self.training_config.get("a100", {}).get(
             "fa3_replay_cache", {}
@@ -520,6 +521,15 @@ def install_grid_trainer_patch() -> None:
         return result
 
     def sample_grid_sigmas(self):
+        recorder = getattr(self, "trajectory_recorder", None)
+        if recorder is not None:
+            return recorder.sample_renoise_sigmas(
+                low=float(self.dmd_config.get("renoise_sigma_min", 0.02)),
+                high=float(self.dmd_config.get("renoise_sigma_max", 0.98)),
+                video_shift=float(self.video_shift),
+                audio_shift=float(self.audio_shift),
+                device=self.shared_model.device,
+            )
         # Uniform over the 1000 discrete quadrature points. Shift is computed
         # in float32 on CPU from the exact frozen grid value, then moved to GPU,
         # making the table timestep pair bitwise reproducible.
