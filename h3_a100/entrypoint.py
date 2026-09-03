@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -42,6 +44,7 @@ def _seed_rank(config) -> int:
 
 def main():
     args = parse_args()
+    os.environ.setdefault("H3_TRAJECTORY_CONFIG_PATH", str(Path(args.config).resolve()))
     config = load_config(args.config)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True

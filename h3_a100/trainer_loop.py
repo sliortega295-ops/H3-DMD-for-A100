@@ -24,6 +24,7 @@ from lightx2v_train.runtime.sequence_parallel import sync_sequence_parallel_grad
 
 from .matched_contract import FAKE_ROLE, STUDENT_ROLE, validate_global_snapshots
 from .model import FAKE_ADAPTER, STUDENT_ADAPTER
+from .trajectory import TrajectoryRecorder
 from .trainer_runtime import PreparedFakeUpdate
 
 
@@ -51,7 +52,32 @@ class H3A100LoopMixin:
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
 
+        base_seed = int(
+            self.training_config.get(
+                "seed", os.environ.get("H3_BENCHMARK_SEED", "20260817")
+            )
+        )
+        self.trajectory_recorder = TrajectoryRecorder.from_environment(
+            rank=get_rank(),
+            world_size=get_world_size(),
+            seed=base_seed,
+            variant=self.trajectory_variant,
+        )
+        if self.trajectory_recorder is not None:
+            if not self.matched_compute_enabled:
+                raise RuntimeError("H3 trajectory mode requires matched_compute.enabled=true")
+            self.trajectory_recorder.start_run(
+                current_iter=current_iter,
+                max_train_iters=self.max_train_iters,
+                named_parameters=self.shared_model.denoiser_module().named_parameters(),
+                student_parameters=self.trainable_params,
+                fake_parameters=self.fake_trainable_params,
+            )
+
         while current_iter < self.max_train_iters:
+            cycle_index = current_iter
+            if self.trajectory_recorder is not None:
+                self.trajectory_recorder.begin_cycle(cycle_index)
             if self.matched_compute_enabled:
                 self.matched_cycle_census.reset()
             self._begin_boundary_offload_cycle()
@@ -59,13 +85,35 @@ class H3A100LoopMixin:
                 running_dmd = self._student_step(samples, grad_accum_iters, current_iter)
             with self._nvtx("h3/critic_phase"):
                 running_fake = self._fake_steps(samples, grad_accum_iters)
+            matched_snapshot = None
             if self.matched_compute_enabled:
-                self._validate_matched_cycle(current_iter)
+                matched_snapshot = self._validate_matched_cycle(current_iter)
             self._validate_boundary_offload_cycle(current_iter)
 
             current_iter += 1
             display_dmd = reduce_mean(running_dmd)
             display_fake = reduce_mean(running_fake)
+            if self.trajectory_recorder is not None:
+                if matched_snapshot is None:
+                    raise RuntimeError("trajectory cycle has no matched-compute snapshot")
+                self.trajectory_recorder.finish_cycle(
+                    cycle=cycle_index,
+                    world_dmd=display_dmd,
+                    world_fake=display_fake,
+                    matched_snapshot=matched_snapshot,
+                    student_parameters=self.trainable_params,
+                    fake_parameters=self.fake_trainable_params,
+                    student_optimizer=self.optimizer,
+                    fake_optimizer=self.fake_optimizer,
+                    student_scheduler_steps=int(
+                        self.lr_scheduler.state_dict().get("last_epoch", current_iter)
+                    ),
+                    fake_scheduler_steps=int(
+                        self.fake_lr_scheduler.state_dict().get(
+                            "last_epoch", current_iter * self.fake_update_ratio
+                        )
+                    ),
+                )
             if current_iter == 1 or current_iter % self.train_log_every_iters == 0:
                 logger.info(
                     "[h3-a100] iter={}/{} dmd={:.6f} fake={:.6f} lr={:.8f}",
@@ -89,6 +137,8 @@ class H3A100LoopMixin:
             if self.save_every_iters and current_iter % self.save_every_iters == 0:
                 self.save_checkpoint_a100(current_iter)
 
+        if self.trajectory_recorder is not None:
+            self.trajectory_recorder.finish_run()
         logger.info("[h3-a100] train finished iter={}/{}", current_iter, self.max_train_iters)
 
     def _student_step(self, samples: Iterator, grad_accum_iters: int, current_iter: int) -> float:
@@ -124,10 +174,14 @@ class H3A100LoopMixin:
                     "[h3-a100][activation-offload] component=student stats={}",
                     offload.stats,
                 )
+            if self.trajectory_recorder is not None:
+                self.trajectory_recorder.note_loss("student", result["dmd"])
             running_dmd += result["dmd"].item() / grad_accum_iters
 
         sync_sequence_parallel_gradients(self.trainable_params)
         torch.nn.utils.clip_grad_norm_(self.trainable_params, self.max_grad_norm)
+        if self.trajectory_recorder is not None:
+            self.trajectory_recorder.capture_gradient("student", self.trainable_params)
         self._log_residency("before_student_optimizer")
         self.optimizer.step()
         self.lr_scheduler.step()
@@ -197,10 +251,14 @@ class H3A100LoopMixin:
                     offload.stats,
                 )
             self.shared_model.drop_adaln_key(item.cache_key)
+            if self.trajectory_recorder is not None:
+                self.trajectory_recorder.note_loss("fake", loss_fake)
             fake_loss_value += loss_fake.item() / len(group)
 
         sync_sequence_parallel_gradients(self.fake_trainable_params)
         torch.nn.utils.clip_grad_norm_(self.fake_trainable_params, self.max_grad_norm)
+        if self.trajectory_recorder is not None:
+            self.trajectory_recorder.capture_gradient("fake", self.fake_trainable_params)
         self._log_residency("before_fake_optimizer")
         self.fake_optimizer.step()
         self.fake_lr_scheduler.step()
@@ -260,7 +318,7 @@ class H3A100LoopMixin:
             offloaded / 1024**3,
         )
 
-    def _validate_matched_cycle(self, current_iter: int) -> None:
+    def _validate_matched_cycle(self, current_iter: int) -> dict:
         local_errors = self.matched_cycle_census.validate_local()
         snapshot = self.matched_cycle_census.snapshot()
         world_size = get_world_size()
@@ -291,6 +349,7 @@ class H3A100LoopMixin:
             len(snapshot["samples"]),
             world_size,
         )
+        return snapshot
 
     def _set_shared_gradient_sync(self, enabled):
         set_parallel_gradient_sync(self.shared_model, enabled)

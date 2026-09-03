@@ -46,7 +46,17 @@ class H3A100RuntimeMixin:
         return super()._sample_synced_int(low, high)
 
     def _sample_renoise_sigmas(self):
-        # Keep the exact continuous random-sigma objective used by upstream.
+        recorder = getattr(self, "trajectory_recorder", None)
+        if recorder is not None:
+            return recorder.sample_renoise_sigmas(
+                low=float(self.dmd_config.get("renoise_sigma_min", 0.02)),
+                high=float(self.dmd_config.get("renoise_sigma_max", 0.98)),
+                video_shift=float(self.video_shift),
+                audio_shift=float(self.audio_shift),
+                device=self.shared_model.device,
+            )
+        # Keep the exact continuous random-sigma objective used by upstream
+        # when the explicit 50-cycle comparison mode is disabled.
         return super()._sample_renoise_sigmas()
 
     @staticmethod

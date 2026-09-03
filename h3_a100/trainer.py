@@ -36,6 +36,7 @@ class MiniMaxH3A100DmdTrainer(
 
     trainer_name = "minimax_h3_t2av_dmd_a100"
     allowed_model_names = {"minimax_h3_t2av_a100"}
+    trajectory_variant = "exact"
 
     def __init__(self, config):
         super().__init__(config)
